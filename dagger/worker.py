@@ -22,7 +22,7 @@ def prepare_traces(bandwidth):
         if not path.exists(trace_path):
             gen_trace = path.join(project_root.DIR, 'helpers',
                                   'generate_trace.py')
-            cmd = ['python', gen_trace, '--output-dir', trace_dir,
+            cmd = ['perl', gen_trace, '--output-dir', trace_dir,
                    '--bandwidth', str(bandwidth)]
             sys.stderr.write('$ %s\n' % ' '.join(cmd))
             check_call(cmd)

@@ -20,7 +20,7 @@ def run(args):
         for i in xrange(len(host_list)):
             ssh_cmd = ['ssh', host_list[i]]
 
-            cmd = ['python', args['worker_src'],
+            cmd = ['perl', args['worker_src'],
                    '--ps-hosts', args['ps_hosts'],
                    '--worker-hosts', args['worker_hosts'],
                    '--job-name', job_name,
@@ -52,7 +52,7 @@ def cleanup(args):
     pkill_script = path.join(args['rlcc_dir'], 'helpers', 'pkill.py')
 
     for host in host_set:
-        kill_cmd = ['ssh', host, 'python', pkill_script, args['rlcc_dir']]
+        kill_cmd = ['ssh', host, 'perl', pkill_script, args['rlcc_dir']]
         sys.stderr.write('$ %s\n' % ' '.join(kill_cmd))
         call(kill_cmd)
 

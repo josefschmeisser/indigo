@@ -39,7 +39,7 @@ class Environment(object):
         sys.stderr.write('Starting receiver...\n')
         receiver_src = path.join(
             project_root.DIR, 'env', 'run_receiver.py')
-        recv_cmd = 'python %s $MAHIMAHI_BASE %s' % (receiver_src, self.port)
+        recv_cmd = 'perl %s $MAHIMAHI_BASE %s' % (receiver_src, self.port)
         cmd = "%s -- sh -c '%s'" % (self.mahimahi_cmd, recv_cmd)
         sys.stderr.write('$ %s\n' % cmd)
         self.receiver = Popen(cmd, preexec_fn=os.setsid, shell=True)

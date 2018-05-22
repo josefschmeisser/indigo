@@ -46,7 +46,7 @@ def setup(args):
             ssh_cmd = ['ssh', host, '-o', 'StrictHostKeyChecking=no']
 
             setup_src = path.join(args.rlcc_dir, 'helpers', 'setup.py')
-            cmd = ssh_cmd + ['python', setup_src, '--local']
+            cmd = ssh_cmd + ['perl', setup_src, '--local']
 
             if args.install_deps:
                 cmd += ['--install-deps']

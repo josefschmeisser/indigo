@@ -2,4 +2,5 @@
 *.pyc
 *.log
 *~
+.vscode
 dagger/logs

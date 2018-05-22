@@ -23,7 +23,6 @@ class Receiver(object):
 
     def construct_ack_from_data(self, serialized_data):
         """Construct a serialized ACK that acks a serialized datagram."""
-
         data = datagram_pb2.Data()
         data.ParseFromString(serialized_data)
 
