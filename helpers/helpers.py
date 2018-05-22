@@ -17,7 +17,7 @@ math_ops = {
     '+': operator.add,
     '-': operator.sub,
     '*': operator.mul,
-    '/': operator.div,
+    '/': operator.truediv
 }
 
 
