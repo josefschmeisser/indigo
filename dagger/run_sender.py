@@ -8,10 +8,19 @@ from os import path
 from env.sender import Sender
 from models import DaggerLSTM
 from helpers.helpers import normalize, one_hot, softmax
+from helpers import make_sure_path_exists
 
+class DataSetGen(object):
+    def __init__(self, output_file):
+        self.output_file = output_file
 
+    def log(self, state, action):
+        self.output_file.write("take action: %d\n" % action)
+
+# TODO check: It does not seem like that this class serves any actuall "learning" purpose
 class Learner(object):
-    def __init__(self, state_dim, action_cnt, restore_vars):
+    def __init__(self, dataset_gen, state_dim, action_cnt, restore_vars):
+        self.dataset_gen = dataset_gen
         self.aug_state_dim = state_dim + action_cnt
         self.action_cnt = action_cnt
         self.prev_action = action_cnt - 1
@@ -51,6 +60,8 @@ class Learner(object):
         # Choose an action to take
         action = np.argmax(action_probs[0][0])
         self.prev_action = action
+        print("action -> %d" % action) # the action index into Sender.action_mapping
+        self.dataset_gen.log(state, action)
 
         # action = np.argmax(np.random.multinomial(1, action_probs[0] - 1e-5))
         # temperature = 1.0
@@ -65,24 +76,30 @@ def main():
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
-    sender = Sender(args.port, debug=args.debug)
+    # output path
+    print("output path: %s" % args.output_dir)
+    make_sure_path_exists(args.output_dir)
+    dataset_path = path.join(args.output_dir, '%s_dataset' % args.bandwidth)
 
-    model_path = path.join(project_root.DIR, 'dagger', 'model', 'model')
+    with open(dataset_path, 'w') as output_file:
+        dataset_gen = DataSetGen(output_file)
 
-    learner = Learner(
-        state_dim=Sender.state_dim,
-        action_cnt=Sender.action_cnt,
-        restore_vars=model_path)
+        sender = Sender(args.port, debug=args.debug)
+        model_path = path.join(project_root.DIR, 'dagger', 'model', 'model')
+        learner = Learner(
+            dataset_gen=dataset_gen,
+            state_dim=Sender.state_dim,
+            action_cnt=Sender.action_cnt,
+            restore_vars=model_path)
+        sender.set_sample_action(learner.sample_action)
 
-    sender.set_sample_action(learner.sample_action)
-
-    try:
-        sender.handshake()
-        sender.run()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        sender.cleanup()
+        try:
+            sender.handshake()
+            sender.run()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            sender.cleanup()
 
 
 if __name__ == '__main__':
