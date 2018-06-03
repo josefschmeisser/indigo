@@ -7,15 +7,23 @@ import tensorflow as tf
 from os import path
 from env.sender import Sender
 from models import DaggerLSTM
-from helpers.helpers import normalize, one_hot, softmax
-from helpers import make_sure_path_exists
+from helpers.helpers import normalize, one_hot, softmax, make_sure_path_exists
 
 class DataSetGen(object):
     def __init__(self, output_file):
         self.output_file = output_file
 
     def log(self, state, action):
-        self.output_file.write("take action: %d\n" % action)
+        # defined in env/sender.py
+        #state = [self.delay_ewma,
+        #         self.delivery_rate_ewma,
+        #         self.send_rate_ewma,
+        #         self.cwnd]
+        aug_state = state + [action]
+        # we need a deliminter like ';' in order to detect unfinished writes
+        # since pantheon simply kills our sending process
+        line = "%f,%f,%f,%d,%d;\n" % tuple(aug_state)
+        self.output_file.write(line)
 
 # TODO check: It does not seem like that this class serves any actuall "learning" purpose
 class Learner(object):
@@ -77,9 +85,11 @@ def main():
     args = parser.parse_args()
 
     # output path
-    print("output path: %s" % args.output_dir)
-    make_sure_path_exists(args.output_dir)
-    dataset_path = path.join(args.output_dir, '%s_dataset' % args.bandwidth)
+#    print("output path: %s" % args.output_dir)
+#    make_sure_path_exists(args.output_dir)
+    output_dir = "/tmp/"
+    bandwidth = "12mbps"
+    dataset_path = path.join(output_dir, '%s_dataset' % bandwidth)
 
     with open(dataset_path, 'w') as output_file:
         dataset_gen = DataSetGen(output_file)
