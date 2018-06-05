@@ -66,9 +66,8 @@ class Learner(object):
         action_probs, self.lstm_state = self.sess.run(ops_to_run, feed_dict)
 
         # Choose an action to take
-        action = np.argmax(action_probs[0][0])
+        action = np.argmax(action_probs[0][0]) # the action index into Sender.action_mapping
         self.prev_action = action
-        print("action -> %d" % action) # the action index into Sender.action_mapping
         self.dataset_gen.log(state, action)
 
         # action = np.argmax(np.random.multinomial(1, action_probs[0] - 1e-5))
