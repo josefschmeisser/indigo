@@ -7,6 +7,9 @@ from helpers import make_sure_path_exists
 
 
 def main():
+    # (num_flows, delta_t)
+    flows = [(1, 30), (3, 30), (1, 30)]
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--bandwidth', metavar='Mbps', required=True,
                         help='constant bandwidth (Mbps)')
@@ -14,9 +17,18 @@ def main():
                         help='directory to output trace')
     args = parser.parse_args()
 
-    # number of packets in 60 seconds
-    num_packets = int(float(args.bandwidth) * 5000)
-    ts_list = np.linspace(0, 60000, num=num_packets, endpoint=False)
+    ts_list = np.empty(0)
+    for num_flows, delta_t in flows:
+        # number of packets in delta_t seconds
+        scale = float(delta_t) / 60.0
+        num_packets = int(float(args.bandwidth) * 5000 * scale)
+        num_packets_per_flow = num_packets/num_flows
+        start = 0
+        if len(ts_list) > 0:
+            start = ts_list[-1]
+        ts_seq = np.linspace(start, start + delta_t*1000, num=num_packets_per_flow, endpoint=False)
+        print(ts_seq)
+        ts_list = np.append(ts_list, ts_seq)
 
     # trace path
     make_sure_path_exists(args.output_dir)
