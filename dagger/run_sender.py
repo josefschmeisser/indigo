@@ -33,6 +33,11 @@ class Learner(object):
         self.action_cnt = action_cnt
         self.prev_action = action_cnt - 1
 
+        ### TODO
+        self.max_patience = 10
+        self.current_patience = self.max_patience
+        ###
+
         with tf.variable_scope('global'):
             self.model = DaggerLSTM(
                 state_dim=self.aug_state_dim, action_cnt=action_cnt)
@@ -67,6 +72,13 @@ class Learner(object):
 
         # Choose an action to take
         action = np.argmax(action_probs[0][0]) # the action index into Sender.action_mapping
+        ### TODO
+        if action == 2 and action == self.prev_action:
+            self.current_patience -= 1
+            if self.current_patience < 1:
+                action = 3
+                self.current_patience = self.max_patience
+        ###
         self.prev_action = action
         self.dataset_gen.log(state, action)
 
