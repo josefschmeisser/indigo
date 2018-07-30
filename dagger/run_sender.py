@@ -4,6 +4,7 @@ import argparse
 import project_root
 import numpy as np
 import tensorflow as tf
+import pandas as pd
 from os import path
 from env.sender import Sender
 from models import DaggerLSTM
@@ -19,10 +20,11 @@ class DataSetGen(object):
         #         self.delivery_rate_ewma,
         #         self.send_rate_ewma,
         #         self.cwnd]
-        aug_state = state + [action]
+        ts = pd.Timestamp.now().value
+        aug_state = [ts] + state + [action]
         # we need a deliminter like ';' in order to detect unfinished writes
         # since pantheon simply kills our sending process
-        line = "%f,%f,%f,%d,%d;\n" % tuple(aug_state)
+        line = "%lu,%f,%f,%f,%d,%d;\n" % tuple(aug_state)
         self.output_file.write(line)
 
 # TODO check: It does not seem like that this class serves any actuall "learning" purpose
@@ -73,11 +75,13 @@ class Learner(object):
         # Choose an action to take
         action = np.argmax(action_probs[0][0]) # the action index into Sender.action_mapping
         ### TODO
+        """
         if action == 2 and action == self.prev_action:
             self.current_patience -= 1
             if self.current_patience < 1:
                 action = 3
                 self.current_patience = self.max_patience
+        """
         ###
         self.prev_action = action
         self.dataset_gen.log(state, action)
