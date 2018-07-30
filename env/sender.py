@@ -34,6 +34,11 @@ class Sender(object):
         self.train = train
         self.debug = debug
 
+        ### TODO
+        self.max_patience = 10
+        self.current_patience = self.max_patience
+        ###
+
         # UDP socket and poller
         self.peer_addr = None
 
@@ -142,12 +147,24 @@ class Sender(object):
             self.send_rate_ewma = (
                 0.875 * self.send_rate_ewma + 0.125 * send_rate)
 
+    def take_action_old(self, action_idx):
+        old_cwnd = self.cwnd
+        op, val = self.action_mapping[action_idx]
+
+        self.cwnd = apply_op(op, self.cwnd, val)
+        self.cwnd = max(2.0, self.cwnd)
+
     def take_action(self, action_idx):
         old_cwnd = self.cwnd
         op, val = self.action_mapping[action_idx]
 
         self.cwnd = apply_op(op, self.cwnd, val)
         self.cwnd = max(2.0, self.cwnd)
+
+        if old_cwnd == self.cwnd:
+            self.current_patience -= 1
+            if self.current_patience < 1:
+                self.cwnd = int(self.cwnd*1.1)
 
     def window_is_open(self):
         return self.seq_num - self.next_ack < self.cwnd
