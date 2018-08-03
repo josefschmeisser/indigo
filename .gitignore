@@ -3,4 +3,5 @@
 *.log
 *~
 .vscode
+.ipynb_checkpoints
 dagger/logs
