@@ -99,12 +99,8 @@ def main():
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
-    # output path
-#    print("output path: %s" % args.output_dir)
-#    make_sure_path_exists(args.output_dir)
     output_dir = "/tmp/"
-    bandwidth = "12mbps"
-    dataset_path = path.join(output_dir, '%s_dataset' % bandwidth)
+    dataset_path = path.join(output_dir, 'indigo_dataset')
 
     with open(dataset_path, 'w') as output_file:
         dataset_gen = DataSetGen(output_file)
