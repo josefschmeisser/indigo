@@ -1,23 +1,20 @@
 #!/usr/bin/env python2
 
 import time
+import os
+import shutil
 
 from mininet.topo import Topo
 from mininet.net import Mininet
 from mininet.node import CPULimitedHost
 from mininet.link import TCLink
-from mininet.util import dumpNodeConnections
+from mininet.util import dumpNodeConnections, pmonitor
 from mininet.log import setLogLevel
 
 from multiprocessing import Process
-from util.monitor import monitor_qlen
+from util.monitor import monitor_qlen, monitor_dropped
 
-"""
-
-"""
-
-class SingleSwitchTopo(Topo):
-    "Single switch connected to n hosts."
+class TwoSwitchTopo(Topo):
     def build(self):
         s1 = self.addSwitch('s1')
         s2 = self.addSwitch('s2')
@@ -25,15 +22,15 @@ class SingleSwitchTopo(Topo):
         h1 = self.addHost('h1')
         h2 = self.addHost('h2')
 
-        # 12 Mbps, 5ms delay, 2% loss, 1000 packet queue
-        self.addLink(s1, s2, bw=12, delay='5ms', max_queue_size=1000, use_htb=True)
-
         self.addLink(h1, s1)
         self.addLink(s2, h2)
 
+        # 12 Mbps, 5ms delay, 2% loss, 1000 packet queue
+        self.addLink(s1, s2, bw=12, delay='10ms', max_queue_size=1000, use_htb=True)
+
 def perfTest():
     "Create network and run simple performance test"
-    topo = SingleSwitchTopo()
+    topo = TwoSwitchTopo()
     # TODO remove CPU limit?
     net = Mininet(topo=topo, host=CPULimitedHost, link=TCLink)
     net.start()
@@ -41,13 +38,24 @@ def perfTest():
     dumpNodeConnections( net.hosts )
     print "Testing network connectivity"
     net.pingAll()
-    print "Testing bandwidth between h1 and h4"
 
     h1, h2 = net.get('h1', 'h2')
 
-    # start qlen monitor
-    monitor = Process(target=monitor_qlen, args=('s1-eth1', 0.01, '/tmp/qlen_s1-eth1.txt'))
-    monitor.start()
+    # start monitors
+    monitors = []
+#    monitors.append(Process(target=monitor_qlen, args=('s1-eth1', 0.01, '/tmp/qlen_s1-eth1.txt')))
+    monitors.append(Process(target=monitor_qlen, args=('s1-eth2', 0.01, '/tmp/qlen_s1-eth2.txt')))
+#    monitors.append(Process(target=monitor_qlen, args=('s2-eth1', 0.01, '/tmp/qlen_s2-eth1.txt')))
+#    monitors.append(Process(target=monitor_qlen, args=('s2-eth2', 0.01, '/tmp/qlen_s2-eth2.txt')))
+#    monitors.append(Process(target=monitor_dropped, args=('s1-eth1', 0.01, '/tmp/dropped_s1-eth1.txt')))
+    monitors.append(Process(target=monitor_dropped, args=('s1-eth2', 0.01, '/tmp/dropped_s1-eth2.txt')))
+#    monitors.append(Process(target=monitor_dropped, args=('s2-eth1', 0.01, '/tmp/dropped_s2-eth1.txt')))
+#    monitors.append(Process(target=monitor_dropped, args=('s2-eth1', 0.01, '/tmp/dropped_s2-eth2.txt')))
+    for monitor in monitors:
+        monitor.start()
+
+    cmd = "from util.monitor import monitor_dropped; monitor_dropped(\"h2-eth0\", 0.01, \"/tmp/dropped_h2.txt\")"
+    mp = h2.popen('python2', '-c', cmd)
 
     # activate conda env
     h1.cmd('export PATH=/home/josef/opt/anaconda2/bin:$PATH && source activate idp-python2-env')
@@ -79,10 +87,24 @@ def perfTest():
     h1.cmd('kill %d' % sender_pid)
     h2.cmd('kill %d' % receiver_pid)
 
-    monitor.terminate()
+    for monitor in monitors:
+        monitor.terminate()
+    mp.kill()
+
     net.stop()
 
 if __name__ == '__main__':
     setLogLevel( 'info' )
     perfTest()
-    # TODO copy results
+    
+    # copy results
+    results_path = './results/exp2/'
+    if not os.path.exists(results_path):
+        os.makedirs(results_path)
+    files = os.listdir(results_path)
+    for file_name in files:
+        os.unlink(results_path + '/' + file_name)
+    shutil.move('/tmp/indigo_dataset', results_path)
+    shutil.move('/tmp/qlen_s1-eth2.txt', results_path)
+    shutil.move('/tmp/dropped_s1-eth2.txt', results_path)
+    shutil.move('/tmp/dropped_h2.txt', results_path)
