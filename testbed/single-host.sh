@@ -11,10 +11,15 @@ echo $(pos_get_variable hostname)
 apt-get update
 # python and tensorflow
 apt-get --yes install python-pip python-dev python-virtualenv
-pip2 install -U pip
-pip2 install -U tensorflow
+#pip2 install -U pip
+pip install -U pip
+#pip2 install -U tensorflow
+pip install -U tensorflow
 # mininet
 apt-get --yes install mininet
+# protobuf
+apt-get --yes install python-protobuf
+# TODO python ipc
 
 # install indigo
 GIT_REPO=$(pos_get_variable git/repo)

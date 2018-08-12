@@ -27,6 +27,12 @@ echo "reboot experiment host..."
 { pos nodes reset "$HOST"; echo "$HOST booted successfully"; } &
 wait
 
+# copy deploy key (enables read-only access to the git repository)
+{ pos nodes push "$HOST" $HOME/deploy_key/id_rsa --dst /root/.ssh/id_rsa;
+  pos nodes push "$HOST" $HOME/deploy_key/id_rsa.pub --dst /root/.ssh/id_rsa.pub; } &
+wait
+pos nodes cmd "$HOST" chmod 600 /root/.ssh/id_rsa
+
 echo "deploy & run experiment scripts..."
 { pos nodes cmd --infile single-host.sh "$HOST"; echo "$HOST userscript executed"; } &
 wait
