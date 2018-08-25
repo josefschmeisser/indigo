@@ -45,13 +45,11 @@ class TrueDaggerExpert(object):
     """ Ground truth expert policy """
 
     def __init__(self, env):
-        assert hasattr(env, 'best_cwnd'), ('Using true dagger expert but not '
-                                           'given a best cwnd when creating '
-                                           'the environment in worker.py.')
-        self.best_cwnd = env.best_cwnd
+        self.env = env
 
     def sample_action(self, cwnd):
         # Gets the action that gives the resulting cwnd closest to the
         # best cwnd.
-        action = get_best_action(Sender.action_mapping, cwnd, self.best_cwnd)
+        best_cwnd = self.env.get_best_cwnd()
+        action = get_best_action(Sender.action_mapping, cwnd, best_cwnd)
         return action

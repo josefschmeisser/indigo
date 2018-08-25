@@ -15,8 +15,6 @@ from env.sender import Sender
 
 def create_env():
     env = MininetEnvironment()
-    ### TODO
-    env.best_cwnd = 5
     return env
 
 
@@ -33,6 +31,7 @@ def run(args):
 
 
 def main():
+    print("worker.py main()")
     parser = argparse.ArgumentParser()
     parser.add_argument('--task-index', metavar='N', type=int, required=True,
                         help='index of task')
