@@ -36,7 +36,7 @@ class DaggerLocal(object):
         env.set_sample_action(self.sample_action)
 
         # Set up Tensorflow for synchronization, training
-        self.setup_tf_ops()
+#        self.setup_tf_ops()
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
@@ -60,6 +60,7 @@ class DaggerLocal(object):
             self.global_network = DaggerLSTM(
                 state_dim=self.aug_state_dim, action_cnt=self.action_cnt)
 
+        """
         self.leader_device_cpu = '/job:ps/task:0/cpu:0'
         with tf.device(self.leader_device_cpu):
             with tf.variable_scope('global_cpu'):
@@ -70,6 +71,7 @@ class DaggerLocal(object):
         gpu_vars = self.global_network.trainable_vars
         self.sync_op = tf.group(*[v1.assign(v2) for v1, v2 in zip(
             cpu_vars, gpu_vars)])
+        """
 
         self.default_batch_size = 300
         self.default_init_state = self.global_network.zero_init_state(
@@ -79,6 +81,8 @@ class DaggerLocal(object):
         self.train_q = tf.FIFOQueue(
                 1, [tf.float32, tf.int32],
                 shared_name='training_feed')
+
+        self.setup_tf_ops()
 
     def cleanup(self):
         self.save_model()
@@ -233,11 +237,21 @@ class DaggerLocal(object):
         self.sess.run(self.global_network.add_one)
 
         # copy trained variables from GPU to CPU
-        self.sess.run(self.sync_op)
+#        self.sess.run(self.sync_op)
 
         print 'DaggerLeader:global_network:cnt', self.sess.run(self.global_network.cnt)
-        print 'DaggerLeader:global_network_cpu:cnt', self.sess.run(self.global_network_cpu.cnt)
+#        print 'DaggerLeader:global_network_cpu:cnt', self.sess.run(self.global_network_cpu.cnt)
         sys.stdout.flush()
+
+    def rollout(self):
+        """ Start an episode/flow with an empty dataset/environment. """
+        self.state_buf = []
+        self.action_buf = []
+        self.prev_action = self.action_cnt - 1
+        self.lstm_state = self.init_state
+
+        self.env.reset()
+        self.env.rollout()
 
     def run(self, debug=False):
         while True:
@@ -245,8 +259,11 @@ class DaggerLocal(object):
                 sys.stderr.write('[WORKER %d Ep %d] Starting...\n' %
                                  (self.task_idx, self.curr_ep))
 
-            print 'DaggerWorker:global_network_cpu:cnt', self.sess.run(self.global_network_cpu.cnt)
+#            print 'DaggerWorker:global_network_cpu:cnt', self.sess.run(self.global_network_cpu.cnt)
             sys.stdout.flush()
+
+            # Start a single episode, populating state-action buffers.
+            self.rollout()
 
             if debug:
                 queue_size = self.sess.run(self.train_q.size())
@@ -259,9 +276,6 @@ class DaggerLocal(object):
             self.sess.run(self.enqueue_train_op, feed_dict={
                 self.state_data: self.state_buf,
                 self.action_data: self.action_buf})
-
-            # FIXME: wait until the buffer is empty
-            time.sleep(1.0)
 
             while True:
                 num_samples = self.sess.run(self.train_q.size())

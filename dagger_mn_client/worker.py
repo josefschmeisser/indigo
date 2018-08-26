@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 from subprocess import check_call
 from os import path
-from dagger_local import DaggerLocal
+from dagger_mn_client.dagger import DaggerLocal
 from env.mn_client_environment import MininetEnvironment
 from env.sender import Sender
 
