@@ -161,10 +161,13 @@ class Sender(object):
         self.cwnd = apply_op(op, self.cwnd, val)
         self.cwnd = max(2.0, self.cwnd)
 
+        ### TODO patience
+        """
         if old_cwnd == self.cwnd:
             self.current_patience -= 1
             if self.current_patience < 1:
                 self.cwnd = int(self.cwnd*1.1)
+        """
 
     def window_is_open(self):
         return self.seq_num - self.next_ack < self.cwnd

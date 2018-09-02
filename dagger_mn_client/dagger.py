@@ -37,8 +37,8 @@ class DaggerLocal(object):
 
         # Set up Tensorflow for synchronization, training
 #        self.setup_tf_ops()
-        self.sess = tf.Session()
-        self.sess.run(tf.global_variables_initializer())
+#        self.sess = tf.Session()
+#        self.sess.run(tf.global_variables_initializer())
 
 
 
@@ -83,6 +83,8 @@ class DaggerLocal(object):
                 shared_name='training_feed')
 
         self.setup_tf_ops()
+        self.sess = tf.Session()
+        self.sess.run(tf.global_variables_initializer())
 
     def cleanup(self):
         self.save_model()
@@ -139,8 +141,8 @@ class DaggerLocal(object):
 
 
         # worker related
-        self.init_state = self.global_network.zero_init_state(1)
-        self.lstm_state = self.init_state
+        self.worker_init_state = self.global_network.zero_init_state(1)
+        self.lstm_state = self.worker_init_state
         # Training data is [[aug_state]], [action]
         self.state_data = tf.placeholder(
                 tf.float32, shape=(None, self.aug_state_dim))
@@ -192,6 +194,8 @@ class DaggerLocal(object):
         batch_size = min(len(self.aggregated_states), self.default_batch_size)
         num_batches = len(self.aggregated_states) / batch_size
 
+        print("DEBUG: batch_size != self.default_batch_size: %s" % str(batch_size != self.default_batch_size))
+        print("DEBUG: batch_size: %d" % batch_size)
         if batch_size != self.default_batch_size:
             self.init_state = self.global_network.zero_init_state(batch_size)
         else:
@@ -248,25 +252,42 @@ class DaggerLocal(object):
         self.state_buf = []
         self.action_buf = []
         self.prev_action = self.action_cnt - 1
-        self.lstm_state = self.init_state
-
+        self.lstm_state = self.worker_init_state
+        print("DEBUG rollout init_state: %s" % self.worker_init_state)
         self.env.reset()
         self.env.rollout()
 
     def run(self, debug=False):
+        print("DaggerLocal.run")
         while True:
+
+            print("pi.action_probs: %s" % str(self.global_network.action_probs))
+            print("pi.state_out: %s" % str(self.global_network.state_out))
+            print("self.lstm_state: %s" % str(self.lstm_state))
+
             if debug:
                 sys.stderr.write('[WORKER %d Ep %d] Starting...\n' %
                                  (self.task_idx, self.curr_ep))
 
 #            print 'DaggerWorker:global_network_cpu:cnt', self.sess.run(self.global_network_cpu.cnt)
+#            sys.stdout.flush()
+            print("call rollout")
             sys.stdout.flush()
-
             # Start a single episode, populating state-action buffers.
             self.rollout()
+            sys.stdout.flush()
 
+            """
             if debug:
                 queue_size = self.sess.run(self.train_q.size())
+                sys.stderr.write(
+                    '[WORKER %d Ep %d]: enqueueing a sequence of data '
+                    'into queue of size %d\n' %
+                    (self.task_idx, self.curr_ep, queue_size))
+            """
+            if debug:
+#                queue_size = self.sess.run(self.train_q.size())
+                queue_size = len(self.action_buf)
                 sys.stderr.write(
                     '[WORKER %d Ep %d]: enqueueing a sequence of data '
                     'into queue of size %d\n' %
@@ -306,6 +327,9 @@ class DaggerLocal(object):
         Appends to the state/action buffers the state and the
         "correct" action to take according to the expert.
         """
+#        print('[DAGGER]: sample_action()')
+#        sys.stdout.flush()
+
         cwnd = state[self.state_dim - 1]
         expert_action = self.expert.sample_action(cwnd)
 

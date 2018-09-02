@@ -26,6 +26,7 @@ def run(args):
     task_index = args.task_index
     sys.stderr.write('Starting task %d\n' % task_index)
     env = create_env()
+    print("create DaggerLocal")
     dagger = DaggerLocal(env, task_index)
     dagger.run(True)
 

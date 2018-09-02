@@ -35,12 +35,17 @@ class MininetEnvironment(object):
 
     def reset(self):
         """Must be called before running rollout()."""
+        print("MininetEnvironment.reset")
         self.cleanup()
 
         self.port = get_open_udp_port()
+        print('open udp port: %d', self.port)
+        sys.stdout.flush()
 
         self.ipc.send_reset_request(self.port)
         self.ipc.wait_for_reset()
+        print("wait_for_reset finished")
+        sys.stdout.flush()
 
         # start sender as an instance of Sender class
         sys.stderr.write('Starting sender...\n')
@@ -49,16 +54,14 @@ class MininetEnvironment(object):
 
         sys.stderr.write('Starting receiver...\n')
         self.ipc.send_start_receiver_request()
-        self.ipc.wait_for_receiver()
+        self.ipc.wait_for_receiver_start_finalization()
 
         # sender completes the handshake sent from receiver
         self.sender.handshake()
 
-        self.cleanup()
-
     def rollout(self):
         """Run sender in env, get final reward of an episode, reset sender."""
-
+        print("MininetEnvironment.rollout")
         sys.stderr.write('Obtaining an episode from environment...\n')
         self.sender.run()
 
@@ -68,6 +71,10 @@ class MininetEnvironment(object):
             self.sender = None
 
         self.ipc.send_stop_receiver_request()
+        self.ipc.wait_for_receiver_stop_finalization()
+        print("MininetEnvironment.cleanup finished")
+        sys.stdout.flush()
+
 
     def get_best_cwnd(self):
         return self.ipc.get_cwnd()
