@@ -32,8 +32,8 @@ class TwoSwitchTopo(Topo):
         self.addLink(h1, s1)
         self.addLink(s2, h2)
 
-        # 12 Mbps, 5ms delay, 2% loss, 1000 packet queue
-        self.addLink(s1, s2, bw=12, delay='10ms', max_queue_size=1000, use_htb=True)
+        # 12 Mbps, 5ms delay, 1000 packet queue
+        self.addLink(s1, s2, bw=12, delay='5ms', max_queue_size=1000, use_htb=True)
 
 
 class Controller(object):
@@ -64,6 +64,8 @@ class Controller(object):
         h1.cmd('./worker.py --task-index %d >indigo-worker-out.txt 2>&1' % task_index)
         self.worker_pid = int(h1.cmd('echo $!'))
         print("worker started")
+
+        self.ipc.set_cwnd(5) # TODO adjust
 
         # wait
         self.sem.acquire()
