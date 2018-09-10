@@ -1,0 +1,2 @@
+model_checkpoint_path: "/root/indigo/dagger/logs/2018-09-02-16-53-20-6132f9bccd43933d4c232b6b0695cccdb7909d88/checkpoint-10"
+all_model_checkpoint_paths: "/root/indigo/dagger/logs/2018-09-02-16-53-20-6132f9bccd43933d4c232b6b0695cccdb7909d88/checkpoint-10"
