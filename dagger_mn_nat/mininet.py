@@ -18,7 +18,7 @@ from multiprocessing import Process
 #from util.monitor import monitor_qlen, monitor_dropped # TODO
 
 
-from helpers.ipc import IndigoIpcMininetView
+from helpers.nat_ipc import IndigoIpcMininetView
 
 
 class TwoSwitchTopo(Topo):
@@ -44,7 +44,7 @@ class Controller(object):
         self.receiver_pids = []
 
         for i in range(worker_cnt):
-            ipc = IndigoIpcMininetView('worker%d' % i)
+            ipc = IndigoIpcMininetView(i)
             ipc.set_handler_fun(self.handle_request, (i, ipc))
             self.worker_ipc_objects.append(ipc)
 
@@ -106,24 +106,34 @@ class Controller(object):
         self.net.stop()
 
     def start_receivers(self):
+        for i in range(self.worker_cnt):
+            pass
+            # TODO
+        """
         h1, h2 = self.net.get('h1', 'h2')
         port = self.ipc.get_port()
         h2.cmd('../env/run_receiver.py %s %d &' % (str(h1.IP()), port))
         self.receiver_pid = int(h2.cmd('echo $!'))
+        """
 
     def stop_receivers(self):
+        pass
+        # TODO
+        """
         if self.receiver_pid is None:
             return
         h2 = self.net.get('h2')
         h2.cmd('kill', self.receiver_pid)
         self.receiver_pid = None
+        """
 
     def rollout(self):
-        pass
+        # TODO wait until the queues are empty
+        # TODO obtain a new 
+        for ipc in self.worker_ipc_objects:
+            ipc.finalize_rollout_request()
 
     def handle_rollout_request(self):
-
-
         with self.lock:
             self.rollout_requests += 1
         self.resume_cv.wait()
@@ -140,26 +150,16 @@ class Controller(object):
         time.sleep(2.0) # FIXME use queue monitor
         self.ipc.finalize_reset_request()
     """
-    def handle_start_receiver_request(self):
-        self.start_receiver()
-        self.ipc.finalize_start_receiver_request()
-    """
-    def handle_stop_receiver_request(self):
-        self.stop_receiver()
-        print('receiver stopped')
-        self.ipc.finalize_stop_receiver_request()
-    """
+
     def handle_request(self, request):
         try:
             print('in handle_request()')
 #            request = self.ipc.get_message()
             print("received request: %s" % str(request))
-            if request == 'reset':
-                self.handle_reset_request()
-            elif request == 'start_receiver':
-                self.handle_start_receiver_request()
-            elif request == 'stop_receiver':
-                self.handle_stop_receiver_request()
+            if request == 'rollout':
+                self.handle_rollout_request()
+            elif request == 'cleanup':
+                self.handle_cleanup_request()
             else:
                 print('unknown request: %s' % str(request))
         except:
@@ -168,5 +168,5 @@ class Controller(object):
 
 # TODO exception handling
 if __name__ == '__main__':
-    controller = Controller()
+    controller = Controller(worker_cnt = 5)
     controller.run()

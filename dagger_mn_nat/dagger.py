@@ -416,54 +416,17 @@ class DaggerWorker(object):
         self.prev_action = self.action_cnt - 1
         self.lstm_state = self.init_state
 
-        self.env.reset()
+#        self.env.reset()
         self.env.rollout()
 
-    def run(self, debug=False):
-        """Runs for max_ep episodes, each time sending data to the leader."""
-
-        pi = self.local_network
+    def run(self):
         while True:
-            if debug:
-                sys.stderr.write('[WORKER %d Ep %d] Starting...\n' %
-                                 (self.task_idx, self.curr_ep))
 
-            # Reset local parameters to global
-            self.sess.run(self.sync_op)
-
-            print 'DaggerWorker:global_network_cpu:cnt', self.sess.run(self.global_network_cpu.cnt)
-            print 'DaggerWorker:local_network:cnt', self.sess.run(self.local_network.cnt)
-            sys.stdout.flush()
-
-            # Start a single episode, populating state-action buffers.
-            self.rollout()
-
-            if debug:
-                queue_size = self.sess.run(self.train_q.size())
-                sys.stderr.write(
-                    '[WORKER %d Ep %d]: enqueueing a sequence of data '
-                    'into queue of size %d\n' %
-                    (self.task_idx, self.curr_ep, queue_size))
-
-            # Enqueue a sequence of data into the training queue.
-            self.sess.run(self.enqueue_train_op, feed_dict={
-                self.state_data: self.state_buf,
-                self.action_data: self.action_buf})
-            self.sess.run(self.sync_q.enqueue(Status.EP_DONE))
-
-            if debug:
-                queue_size = self.sess.run(self.train_q.size())
-                sys.stderr.write(
-                    '[WORKER %d Ep %d]: finished queueing data. '
-                    'queue size now %d\n' %
-                    (self.task_idx, self.curr_ep, queue_size))
-
-            if debug:
-                sys.stderr.write('[WORKER %d Ep %d]: waiting for server\n' %
-                                 (self.task_idx, self.curr_ep))
-
-            # Let the leader dequeue EP_DONE
-            time.sleep(0.5)
+            task_id = self.env.get_task()
+            if task_id == 0:
+                self.stall_for_one_episode()
+            else:
+                self.run_for_one_episode()
 
             # Wait until pserver finishes training by blocking on sync_q
             # Only proceeds when it finds a message from the pserver.
@@ -477,3 +440,54 @@ class DaggerWorker(object):
                 break
 
             self.curr_ep += 1
+
+    def run_for_one_episode(self, debug=False):
+        if debug:
+            sys.stderr.write('[WORKER %d Ep %d] Starting...\n' %
+                                (self.task_idx, self.curr_ep))
+
+        # Reset local parameters to global
+        self.sess.run(self.sync_op)
+
+        print 'DaggerWorker:global_network_cpu:cnt', self.sess.run(self.global_network_cpu.cnt)
+        print 'DaggerWorker:local_network:cnt', self.sess.run(self.local_network.cnt)
+        sys.stdout.flush()
+
+        # Start a single episode, populating state-action buffers.
+        self.rollout()
+
+        if debug:
+            queue_size = self.sess.run(self.train_q.size())
+            sys.stderr.write(
+                '[WORKER %d Ep %d]: enqueueing a sequence of data '
+                'into queue of size %d\n' %
+                (self.task_idx, self.curr_ep, queue_size))
+
+        # Enqueue a sequence of data into the training queue.
+        self.sess.run(self.enqueue_train_op, feed_dict={
+            self.state_data: self.state_buf,
+            self.action_data: self.action_buf})
+        self.sess.run(self.sync_q.enqueue(Status.EP_DONE))
+
+        if debug:
+            queue_size = self.sess.run(self.train_q.size())
+            sys.stderr.write(
+                '[WORKER %d Ep %d]: finished queueing data. '
+                'queue size now %d\n' %
+                (self.task_idx, self.curr_ep, queue_size))
+
+        if debug:
+            sys.stderr.write('[WORKER %d Ep %d]: waiting for server\n' %
+                                (self.task_idx, self.curr_ep))
+
+        # Let the leader dequeue EP_DONE
+        time.sleep(0.5)
+
+    def stall_for_one_episode(self):
+        # Nevertheless, we have to call rollout()
+        self.rollout()
+
+        self.sess.run(self.sync_q.enqueue(Status.EP_DONE))
+
+        # Let the leader dequeue EP_DONE
+        time.sleep(0.5)
