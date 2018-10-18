@@ -45,14 +45,17 @@ class IndigoIpcMininetView(object):
         self.handler_thread = None
 
     def drain_queues(self):
-        pass #TODO
+        pass #TODO drain message queues
 
     def set_cwnd(self, cwnd):
         self.ipc_data.contents.cwnd = cwnd
 
+    def set_idle_state(self, idle):
+        self.ipc_data.contents.idle = idle
+    """
     def set_task_id(self, task_id):
         self.ipc_data.contents.task_id = task_id
-
+    """
     def handler_thread_fun(self):
         while True:
             print('handler_thread loop')
@@ -61,11 +64,10 @@ class IndigoIpcMininetView(object):
                 return
             msg = self.mn_msg_q.receive()
             print('handler_thread msg: %s', str(msg))
-            # TODO try
             try:
                 self.handler_fun(msg[0])
-            except .
-                sys.stderr.write()
+            except:
+                sys.stderr.write('handler_thread_fun: %s' % sys.exc_info()[0])
 
     def set_handler_fun(self, fun, params):
         self.handler_fun = fun
@@ -111,17 +113,8 @@ class IndigoIpcWorkerView(object):
     def get_task_id(self):
         return self.ipc_data.contents.task_id
 
-    """
-    def send_reset_request(self):
-        self.mn_msg_q.send('reset')
-
-    def wait_for_reset(self):
-        msg = self.worker_msq_q.receive()
-        if msg[0] == 'reset_done':
-            return
-        else:
-            raise RuntimeError('IPC protocol violation; message: %s' % str(msg))
-    """
+    def get_idle_state(self):
+        return self.ipc_data.contents.idle
 
     def send_rollout_request(self):
         self.mn_msg_q.send('rollout')

@@ -20,6 +20,9 @@ from multiprocessing import Process
 
 from helpers.nat_ipc import IndigoIpcMininetView
 
+from dagger_mn_nat.scenarios import *
+
+number_of_episodes = 1000
 
 class TwoSwitchTopo(Topo):
     def build(self):
@@ -43,6 +46,8 @@ class Controller(object):
         self.worker_pids = []
         self.receiver_pids = []
 
+        self.active_flows = []
+
         for i in range(worker_cnt):
             ipc = IndigoIpcMininetView(i)
             ipc.set_handler_fun(self.handle_request, (i, ipc))
@@ -65,12 +70,40 @@ class Controller(object):
         topo = TwoSwitchTopo()
         self.net = Mininet(topo=topo, link=TCLink)
 
-    def scenario_loop(self):
-        pass # TODO
-        while True:
-            # do some stuff
+    def udpate_iperf_flows(self, new_flows):
+        # terminate obsolete flows
+        for flow, pid in self.active_flows:
+            if not flow in new_flows:
+                host = self.net.get(flow.host_name)
+                host.cmd('kill', pid)
+            else:
+                new_flows.remove(flow)
+        # start new flows
+        for flow in new_flows:
+            host = self.net.get(flow.host_name)
+            perf_cmd = '' # TODO cmd
+            host.cmd(perf_cmd)
+            pid = int(host.cmd('echo $!'))
+            self.active_flows.append((flow, pid))
 
-            # TODO write cwnds
+    def adjust_network_parameters(self, scenario):
+        pass # TODO
+
+    def scenario_loop(self, scenario):
+        while True:
+            scenario.step()
+
+            new_flows = scenario.get_active_flows()
+            self.udpate_iperf_flows(new_flows)
+
+            self.adjust_network_parameters(scenario)
+
+            active_workers = scenario.get_active_workers()
+            for i in range(self.worker_cnt):
+#            for ipc in self.worker_ipc_objects:
+                ipc = self.worker_ipc_objects[i]
+                ipc.set_cwnd(scenario.get_cwnd())
+                ipc.set_idle_state(active_workers[i])
 
             time.sleep(0.5) # TODO
 
@@ -85,25 +118,40 @@ class Controller(object):
     def run(self):
         self.net.start()
 
-        h1 = self.net.get('h1')
+        print("starting workers...")
+        for i in range(self.worker_cnt):
+            worker_host = self.net.get('h' + i)
+            receiver_host = self.net.get('h' + (self.worker_cnt - i))
 
-        print("starting worker.py...")
+            # start worker
+            task_index = 1 # TODO
+            worker_cmd = './worker ...' # TODO
+            worker_host.cmd(worker_cmd)
+            worker_pid = int(worker_host.cmd('echo $!'))
+            self.worker_pids.append(worker_pid)
+            print("worker started")
 
-        task_index = 1 # TODO
-        worker_cmd = './mn_worker ...' # TODO
-        h1.cmd('./worker.py --task-index %d >indigo-worker-out.txt 2>&1' % task_index)
-        self.worker_pid = int(h1.cmd('echo $!'))
-        print("worker started")
-
-#        self.ipc.set_cwnd(5) # TODO adjust
+            # start receiver
+            pass # TODO
+            receiver_pid = int(receiver_host.cmd('echo $!'))
+            self.receiver_pids.append(receiver_pid)
 
         # wait
 #        self.sem.acquire()
 
-        self.scenario_loop()
+        for _ in range(number_of_episodes):
+            scenario = obtain_scenario(self.worker_cnt)
+            self.scenario_loop(scenario)
 
         print("run() stopping network")
         self.net.stop()
+
+    def start_workers(self):
+        for i in range(self.worker_cnt):
+            pass
+
+    def stop_workers(self):
+        pass
 
     def start_receivers(self):
         for i in range(self.worker_cnt):
@@ -140,16 +188,9 @@ class Controller(object):
 
         pass
 
-    """
-    def cleanup(self):
-        self.sem.release()
-    """
-    """
-    def handle_reset_request(self):
-        print('sleeping')
-        time.sleep(2.0) # FIXME use queue monitor
-        self.ipc.finalize_reset_request()
-    """
+    def handle_cleanup_request(self):
+        # TODO
+        pass
 
     def handle_request(self, request):
         try:

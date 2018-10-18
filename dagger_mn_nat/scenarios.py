@@ -1,15 +1,40 @@
 import numpy as np
 import collections
 
-Scenario = collections.namedtuple('Scenario', 'bw delay woker_0 worker_1 woker_2 woker_3 woker_4')
-Person = collections.namedtuple('Person', 'name age gender')
+#Scenario = collections.namedtuple('Scenario', 'bw delay worker_vec')
+Flow = collections.namedtuple('Flow', 'host_name start_ts bw')
 
-print 'Type of Person:', type(Person)
+class Scenario(object):
+    def __init__(self, bw, delay, worker_vec):
+        self.bw = bw
+        self.delay = delay
+        self.initial_delay = delay
+        self.worker_vec = worker_vec
+        self.ts = 0
 
-bob = Person(name='Bob', age=30, gender='male')
-print '\nRepresentation:', bob
+    def step(self):
+        pass
+        # TODO adjust delay based on initial_delay
 
+    def get_cwnd(self):
+        pass
 
-def obtain_scenario():
+    def get_active_flows(self):
+        return None
+
+    def get_delay(self):
+        return self.delay
+
+    def get_active_workers(self):
+        return self.worker_vec
+
+def obtain_scenario(worker_cnt):
     np.linspace(10, 200)
-    pass
+    bw = 12
+    delay = 10
+
+    while True:
+        worker_vec = np.random.choice(a=[False, True], size=(worker_cnt))
+        if np.count_nonzero(worker_vec) == 0:
+            continue
+        return Scenario(bw=bw, delay=delay, worker_vec=worker_vec)

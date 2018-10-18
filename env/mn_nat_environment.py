@@ -45,5 +45,10 @@ class MininetNatEnvironment(object):
     def get_best_cwnd(self):
         return self.ipc.get_cwnd()
 
+    def idle(self):
+        return self.ipc.get_idle_state()
+
+"""
     def get_task_id(self):
         return self.ipc.get_task_id()
+"""

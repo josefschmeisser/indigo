@@ -421,9 +421,7 @@ class DaggerWorker(object):
 
     def run(self):
         while True:
-
-            task_id = self.env.get_task()
-            if task_id == 0:
+            if self.env.idle():
                 self.stall_for_one_episode()
             else:
                 self.run_for_one_episode()
