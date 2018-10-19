@@ -25,8 +25,18 @@ class MininetNatEnvironment(object):
 
         self.ipc = IndigoIpcWorkerView(worker_id)
 
-        # variables below will be filled in during setup
-        self.sender = None
+        # start sender:
+        sys.stderr.write('Starting sender...\n')
+        self.sender = Sender(self.ipc.get_port(), train=True)
+        self.sender.set_sample_action(self.sample_action)
+
+        ### FIXME check
+        # sender completes the handshake sent from receiver
+        self.sender.handshake()
+
+
+    def cleanup(self):
+        pass # TODO stop sender
 
     def set_sample_action(self, sample_action):
         """Set the sender's policy. Must be called before calling reset()."""
@@ -42,13 +52,10 @@ class MininetNatEnvironment(object):
         print("wait_for_reset finished")
         sys.stdout.flush()
 
+        self.sender.run()
+
     def get_best_cwnd(self):
         return self.ipc.get_cwnd()
 
     def idle(self):
         return self.ipc.get_idle_state()
-
-"""
-    def get_task_id(self):
-        return self.ipc.get_task_id()
-"""

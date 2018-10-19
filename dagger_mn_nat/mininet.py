@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 
+import argparse
 import sys
 import time
 import os
@@ -20,54 +21,64 @@ from multiprocessing import Process
 
 from helpers.nat_ipc import IndigoIpcMininetView
 
-from dagger_mn_nat.scenarios import *
+from dagger_mn_nat.scenarios import obtain_scenario, Scenario
 
+
+port = 5000
 number_of_episodes = 1000
 
+
 class TwoSwitchTopo(Topo):
-    def build(self):
+    def build(self, worker_hosts):
         s1 = self.addSwitch('s1')
         s2 = self.addSwitch('s2')
 
+        """
         h1 = self.addHost('h1')
         h2 = self.addHost('h2')
 
         self.addLink(h1, s1)
         self.addLink(s2, h2)
+        """
+        worker_cnt = len(worker_hosts)
+        for i in range(worker_cnt):
+            worker_host = self.addHost('h%d' % i, ip=worker_hosts[i]) # TODO subnet?
+            self.addLink(worker_host, s1)
+            receiver_host = self.addHost('h%d' % (worker_host - i))
+            self.addLink(receiver_host, s2)
 
+        # TODO
         # 12 Mbps, 5ms delay, 1000 packet queue
         self.addLink(s1, s2, bw=12, delay='5ms', max_queue_size=1000, use_htb=True)
 
 
 class Controller(object):
-    def __init__(self, worker_cnt):
-        self.worker_cnt = worker_cnt
+    def __init__(self, args):
+        self.args = args
+        self.worker_hosts = args.worker_hosts.split(',')
+        self.worker_cnt = len(self.worker_hosts)
         self.worker_ipc_objects = []
         self.worker_pids = []
         self.receiver_pids = []
 
         self.active_flows = []
 
-        for i in range(worker_cnt):
+        for i in range(self.worker_cnt):
             ipc = IndigoIpcMininetView(i)
             ipc.set_handler_fun(self.handle_request, (i, ipc))
             self.worker_ipc_objects.append(ipc)
 
-#        self.sem = threading.Semaphore(value=0)
-
         self.lock = threading.Lock()
-
         self.resume_cv = threading.Condition()
 
-        self.change_scenario = True
         self.rollout_requests = 0
-
+        self.stop = False
 
         self.setup_net()
 
     def setup_net(self):
         "Create network and run simple performance test"
-        topo = TwoSwitchTopo()
+        topo = TwoSwitchTopo(self.worker_hosts)
         self.net = Mininet(topo=topo, link=TCLink)
 
     def udpate_iperf_flows(self, new_flows):
@@ -90,7 +101,7 @@ class Controller(object):
         pass # TODO
 
     def scenario_loop(self, scenario):
-        while True:
+        while not self.stop:
             scenario.step()
 
             new_flows = scenario.get_active_flows()
@@ -100,7 +111,6 @@ class Controller(object):
 
             active_workers = scenario.get_active_workers()
             for i in range(self.worker_cnt):
-#            for ipc in self.worker_ipc_objects:
                 ipc = self.worker_ipc_objects[i]
                 ipc.set_cwnd(scenario.get_cwnd())
                 ipc.set_idle_state(active_workers[i])
@@ -118,66 +128,60 @@ class Controller(object):
     def run(self):
         self.net.start()
 
-        print("starting workers...")
-        for i in range(self.worker_cnt):
-            worker_host = self.net.get('h' + i)
-            receiver_host = self.net.get('h' + (self.worker_cnt - i))
-
-            # start worker
-            task_index = 1 # TODO
-            worker_cmd = './worker ...' # TODO
-            worker_host.cmd(worker_cmd)
-            worker_pid = int(worker_host.cmd('echo $!'))
-            self.worker_pids.append(worker_pid)
-            print("worker started")
-
-            # start receiver
-            pass # TODO
-            receiver_pid = int(receiver_host.cmd('echo $!'))
-            self.receiver_pids.append(receiver_pid)
-
-        # wait
-#        self.sem.acquire()
+        self.start_workers()
+        self.start_receivers()
 
         for _ in range(number_of_episodes):
+            if self.stop:
+                break
             scenario = obtain_scenario(self.worker_cnt)
             self.scenario_loop(scenario)
 
         print("run() stopping network")
         self.net.stop()
 
-    def start_workers(self):
-        for i in range(self.worker_cnt):
-            pass
-
-    def stop_workers(self):
-        pass
-
     def start_receivers(self):
+        print("starting receivers...")
         for i in range(self.worker_cnt):
-            pass
-            # TODO
-        """
-        h1, h2 = self.net.get('h1', 'h2')
-        port = self.ipc.get_port()
-        h2.cmd('../env/run_receiver.py %s %d &' % (str(h1.IP()), port))
-        self.receiver_pid = int(h2.cmd('echo $!'))
-        """
+            worker_host = self.net.get('h' + i)
+            receiver_host = self.net.get('h' + (self.worker_cnt - i))
+            receiver_cmd = '../env/run_receiver.py %s %d &' % (str(worker_host.IP()), port)
+            receiver_host.cmd(receiver_cmd)
+            receiver_pid = int(receiver_host.cmd('echo $!'))
+            self.receiver_pids.append(receiver_pid)
+
+    def start_workers(self):
+        print("starting workers...")
+        for i in range(self.worker_cnt):
+            worker_host = self.net.get('h' + i)
+            task_index = 1 # TODO
+            worker_cmd = './worker ' \
+                         '--job-name worker ' \
+                         '--task-index {0} ' \
+                         '--ps-hosts {1} ' \
+                         '--worker-hosts {2}' \
+                         .format(task_index, self.args.ps_hosts, self.args.worker_hosts)
+            # start worker
+            worker_host.cmd(worker_cmd)
+            worker_pid = int(worker_host.cmd('echo $!'))
+            self.worker_pids.append(worker_pid)
+            print("worker started")
 
     def stop_receivers(self):
-        pass
-        # TODO
-        """
-        if self.receiver_pid is None:
-            return
-        h2 = self.net.get('h2')
-        h2.cmd('kill', self.receiver_pid)
-        self.receiver_pid = None
-        """
+        for i in range(self.worker_cnt):
+            receiver_host = self.net.get('h' + (self.worker_cnt - i))
+            receiver_host.cmd('kill', self.receiver_pids[i])
+        self.receiver_pids = []
+
+    def stop_workers(self):
+        for i in range(self.worker_cnt):
+            worker_host = self.net.get('h' + i)
+            worker_host.cmd('kill', self.worker_pids[i])
+        self.worker_pids = []
 
     def rollout(self):
         # TODO wait until the queues are empty
-        # TODO obtain a new 
+        # TODO obtain a new scenario
         for ipc in self.worker_ipc_objects:
             ipc.finalize_rollout_request()
 
@@ -186,16 +190,14 @@ class Controller(object):
             self.rollout_requests += 1
         self.resume_cv.wait()
 
-        pass
-
     def handle_cleanup_request(self):
-        # TODO
-        pass
+        self.stop = True
+        self.stop_workers()
+        self.stop_receivers()
 
     def handle_request(self, request):
         try:
             print('in handle_request()')
-#            request = self.ipc.get_message()
             print("received request: %s" % str(request))
             if request == 'rollout':
                 self.handle_rollout_request()
@@ -207,7 +209,24 @@ class Controller(object):
             e = sys.exc_info()[0]
             print('exception in handle_request(): %s' % str(e))
 
-# TODO exception handling
-if __name__ == '__main__':
-    controller = Controller(worker_cnt = 5)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--ps-hosts', required=True, metavar='[HOSTNAME:PORT, ...]',
+        help='comma-separated list of hostname:port of parameter servers')
+    parser.add_argument(
+        '--worker-hosts', required=True, metavar='[HOSTNAME:PORT, ...]',
+        help='comma-separated list of hostname:port of workers')
+    parser.add_argument('--job-name', choices=['ps', 'worker'],
+                        required=True, help='ps or worker')
+    parser.add_argument('--task-index', metavar='N', type=int, required=True,
+                        help='index of task')
+    args = parser.parse_args()
+
+    controller = Controller(args)
     controller.run()
+
+
+if __name__ == '__main__':
+    main()

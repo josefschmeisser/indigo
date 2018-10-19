@@ -239,6 +239,7 @@ class Sender(object):
         self.poller.modify(self.sock, ALL_FLAGS)
         curr_flags = ALL_FLAGS
 
+        self.running = True
         while self.running:
             if self.window_is_open():
                 if curr_flags != ALL_FLAGS:

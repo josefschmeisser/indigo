@@ -8,12 +8,12 @@ import numpy as np
 import tensorflow as tf
 from subprocess import check_call
 from os import path
-from dagger_mn_client.dagger import DaggerLocal
+from dagger_mn_nat.dagger import DaggerLeader, DaggerWorker
 from env.mn_client_environment import MininetEnvironment
 from env.sender import Sender
 
 
-def create_env():
+def create_env(task_index):
     env = MininetEnvironment()
     return env
 
@@ -23,17 +23,50 @@ def run(args):
     associated with the cluster and server.
     """
 
+    job_name = args.job_name
     task_index = args.task_index
-    sys.stderr.write('Starting task %d\n' % task_index)
-    env = create_env()
-    print("create DaggerLocal")
-    dagger = DaggerLocal(env, task_index)
-    dagger.run(True)
+    sys.stderr.write('Starting job %s task %d\n' % (job_name, task_index))
+
+    ps_hosts = args.ps_hosts.split(',')
+    worker_hosts = args.worker_hosts.split(',')
+    num_workers = len(worker_hosts)
+
+    cluster = tf.train.ClusterSpec({'ps': ps_hosts, 'worker': worker_hosts})
+    server = tf.train.Server(cluster, job_name=job_name, task_index=task_index)
+
+    if job_name == 'ps':
+        # Sets up the queue, shared variables, and global classifier.
+        worker_tasks = set([idx for idx in xrange(num_workers)])
+        leader = DaggerLeader(cluster, server, worker_tasks)
+        try:
+            leader.run(debug=True)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            leader.cleanup()
+
+    elif job_name == 'worker':
+        # Sets up the env, shared variables (sync, classifier, queue, etc)
+        env = create_env(task_index)
+        learner = DaggerWorker(cluster, server, task_index, env)
+        try:
+            learner.run(debug=True)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            learner.cleanup()
 
 
 def main():
-    print("worker.py main()")
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--ps-hosts', required=True, metavar='[HOSTNAME:PORT, ...]',
+        help='comma-separated list of hostname:port of parameter servers')
+    parser.add_argument(
+        '--worker-hosts', required=True, metavar='[HOSTNAME:PORT, ...]',
+        help='comma-separated list of hostname:port of workers')
+    parser.add_argument('--job-name', choices=['ps', 'worker'],
+                        required=True, help='ps or worker')
     parser.add_argument('--task-index', metavar='N', type=int, required=True,
                         help='index of task')
     args = parser.parse_args()

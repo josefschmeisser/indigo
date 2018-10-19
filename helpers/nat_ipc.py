@@ -14,9 +14,10 @@ class IpcData(Structure):
     _fields_ = [
         ("cwnd", c_uint32), # set by the mn controller
         ("idle", c_bool),   # set by the mn controller
+        ("port", c_uint16), # set by the mn controller
         ("task_id", c_uint32)]
 
-shm_fmt_str = '=I?I'
+shm_fmt_str = '=I?HI'
 
 class IndigoIpcMininetView(object):
     def __init__(self, worker_id):
@@ -52,6 +53,9 @@ class IndigoIpcMininetView(object):
 
     def set_idle_state(self, idle):
         self.ipc_data.contents.idle = idle
+
+    def set_port(self, port):
+        self.ipc_data.contents.port = port
     """
     def set_task_id(self, task_id):
         self.ipc_data.contents.task_id = task_id
@@ -115,6 +119,9 @@ class IndigoIpcWorkerView(object):
 
     def get_idle_state(self):
         return self.ipc_data.contents.idle
+
+    def get_port(self):
+        return self.ipc_data.contents.port
 
     def send_rollout_request(self):
         self.mn_msg_q.send('rollout')
