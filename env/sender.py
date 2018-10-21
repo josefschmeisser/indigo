@@ -148,7 +148,6 @@ class Sender(object):
                 0.875 * self.send_rate_ewma + 0.125 * send_rate)
 
     def take_action_old(self, action_idx):
-        old_cwnd = self.cwnd
         op, val = self.action_mapping[action_idx]
 
         self.cwnd = apply_op(op, self.cwnd, val)

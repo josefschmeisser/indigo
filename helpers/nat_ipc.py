@@ -39,7 +39,7 @@ class IndigoIpcMininetView(object):
         self.worker_msq_q = posix_ipc.MessageQueue('/indigo_worker_msg_q_worker_%d' % worker_id, posix_ipc.O_CREAT)
         self.drain_queues()
 
-        # set initial values
+        # set some initial values
         self.ipc_data.contents.cwnd = 5
         self.ipc_data.contents.port = 5555
 

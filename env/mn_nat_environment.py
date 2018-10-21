@@ -34,7 +34,6 @@ class MininetNatEnvironment(object):
         # sender completes the handshake sent from receiver
         self.sender.handshake()
 
-
     def cleanup(self):
         pass # TODO stop sender
 

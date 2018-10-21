@@ -42,9 +42,9 @@ class TwoSwitchTopo(Topo):
         """
         worker_cnt = len(worker_hosts)
         for i in range(worker_cnt):
-            worker_host = self.addHost('h%d' % i, ip=worker_hosts[i]) # TODO subnet?
+            worker_host = self.addHost('h{0}'.format(i), ip=worker_hosts[i]) # TODO subnet?
             self.addLink(worker_host, s1)
-            receiver_host = self.addHost('h%d' % (worker_host - i))
+            receiver_host = self.addHost('h{0}'.format(worker_cnt - i))
             self.addLink(receiver_host, s2)
 
         # TODO
@@ -126,6 +126,7 @@ class Controller(object):
                 self.resume_cv.notify_all()
 
     def run(self):
+        self.net.addNAT().configDefault()
         self.net.start()
 
         self.start_workers()
@@ -143,8 +144,8 @@ class Controller(object):
     def start_receivers(self):
         print("starting receivers...")
         for i in range(self.worker_cnt):
-            worker_host = self.net.get('h' + i)
-            receiver_host = self.net.get('h' + (self.worker_cnt - i))
+            worker_host =self.net.get('h{0}'.format(i))
+            receiver_host = self.net.get('h{0}'.format(self.worker_cnt - i))
             receiver_cmd = '../env/run_receiver.py %s %d &' % (str(worker_host.IP()), port)
             receiver_host.cmd(receiver_cmd)
             receiver_pid = int(receiver_host.cmd('echo $!'))
@@ -153,14 +154,14 @@ class Controller(object):
     def start_workers(self):
         print("starting workers...")
         for i in range(self.worker_cnt):
-            worker_host = self.net.get('h' + i)
-            task_index = 1 # TODO
+            worker_host = self.net.get('h{0}'.format(i))
             worker_cmd = './worker ' \
                          '--job-name worker ' \
                          '--task-index {0} ' \
                          '--ps-hosts {1} ' \
                          '--worker-hosts {2}' \
-                         .format(task_index, self.args.ps_hosts, self.args.worker_hosts)
+                         .format(self.args.task_index, self.args.ps_hosts, self.args.worker_hosts)
+            print("worker_cmd: {0}".format(worker_cmd))
             # start worker
             worker_host.cmd(worker_cmd)
             worker_pid = int(worker_host.cmd('echo $!'))
@@ -169,13 +170,13 @@ class Controller(object):
 
     def stop_receivers(self):
         for i in range(self.worker_cnt):
-            receiver_host = self.net.get('h' + (self.worker_cnt - i))
+            receiver_host = self.net.get('h{0}'.format(self.worker_cnt - i))
             receiver_host.cmd('kill', self.receiver_pids[i])
         self.receiver_pids = []
 
     def stop_workers(self):
         for i in range(self.worker_cnt):
-            worker_host = self.net.get('h' + i)
+            worker_host = self.net.get('h{0}'.format(i))
             worker_host.cmd('kill', self.worker_pids[i])
         self.worker_pids = []
 
@@ -218,8 +219,8 @@ def main():
     parser.add_argument(
         '--worker-hosts', required=True, metavar='[HOSTNAME:PORT, ...]',
         help='comma-separated list of hostname:port of workers')
-    parser.add_argument('--job-name', choices=['ps', 'worker'],
-                        required=True, help='ps or worker')
+#    parser.add_argument('--job-name', choices=['ps', 'worker'],
+#                        required=True, help='ps or worker')
     parser.add_argument('--task-index', metavar='N', type=int, required=True,
                         help='index of task')
     args = parser.parse_args()
