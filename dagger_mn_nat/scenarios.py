@@ -22,8 +22,8 @@ class Scenario(object):
             self.delay = np.random.normal(loc=self.initial_delay, scale=0.1*self.initial_delay)
 
     def get_cwnd(self):
-        pass
-
+        return 5 # TODO
+# TODO indvidual delays
     def get_active_flows(self):
         return [] # TODO
 

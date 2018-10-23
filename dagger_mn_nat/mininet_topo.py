@@ -33,13 +33,6 @@ class TwoSwitchTopo(Topo):
         s1 = self.addSwitch('s1')
         s2 = self.addSwitch('s2')
 
-        """
-        h1 = self.addHost('h1')
-        h2 = self.addHost('h2')
-
-        self.addLink(h1, s1)
-        self.addLink(s2, h2)
-        """
         worker_cnt = len(worker_hosts)
         for i in range(worker_cnt):
             worker_host = self.addHost('h{0}'.format(i), ip=worker_hosts[i]) # TODO subnet?
@@ -219,8 +212,6 @@ def main():
     parser.add_argument(
         '--worker-hosts', required=True, metavar='[HOSTNAME:PORT, ...]',
         help='comma-separated list of hostname:port of workers')
-#    parser.add_argument('--job-name', choices=['ps', 'worker'],
-#                        required=True, help='ps or worker')
     parser.add_argument('--task-index', metavar='N', type=int, required=True,
                         help='index of task')
     args = parser.parse_args()
