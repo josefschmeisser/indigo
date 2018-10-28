@@ -419,12 +419,12 @@ class DaggerWorker(object):
 #        self.env.reset()
         self.env.rollout()
 
-    def run(self):
+    def run(self, debug=False):
         while True:
             if self.env.idle():
                 self.stall_for_one_episode()
             else:
-                self.run_for_one_episode()
+                self.run_for_one_episode(debug=debug)
 
             # Wait until pserver finishes training by blocking on sync_q
             # Only proceeds when it finds a message from the pserver.

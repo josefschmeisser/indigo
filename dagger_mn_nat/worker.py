@@ -9,12 +9,12 @@ import tensorflow as tf
 from subprocess import check_call
 from os import path
 from dagger_mn_nat.dagger import DaggerLeader, DaggerWorker
-from env.mn_client_environment import MininetEnvironment
+from env.mn_nat_environment import MininetNatEnvironment
 from env.sender import Sender
 
 
-def create_env(task_index):
-    env = MininetEnvironment()
+def create_env(task_index, worker_id):
+    env = MininetNatEnvironment(worker_id)
     return env
 
 
@@ -47,7 +47,7 @@ def run(args):
 
     elif job_name == 'worker':
         # Sets up the env, shared variables (sync, classifier, queue, etc)
-        env = create_env(task_index)
+        env = create_env(task_index, args.worker_id)
         learner = DaggerWorker(cluster, server, task_index, env)
         try:
             learner.run(debug=True)
@@ -69,6 +69,8 @@ def main():
                         required=True, help='ps or worker')
     parser.add_argument('--task-index', metavar='N', type=int, required=True,
                         help='index of task')
+    parser.add_argument('--worker-id', metavar='N', type=int, required=False,
+                        help='id of worker')
     args = parser.parse_args()
 
     # run parameter servers and workers
