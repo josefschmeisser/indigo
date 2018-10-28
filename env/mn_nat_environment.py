@@ -25,14 +25,7 @@ class MininetNatEnvironment(object):
 
         self.ipc = IndigoIpcWorkerView(worker_id)
 
-        # start sender:
-        sys.stderr.write('Starting sender...\n')
-        self.sender = Sender(self.ipc.get_port(), train=True)
-        self.sender.set_sample_action(self.sample_action)
-
-        ### FIXME check
-        # sender completes the handshake sent from receiver
-        self.sender.handshake()
+        self.started = False
 
     def cleanup(self):
         pass # TODO stop sender
@@ -42,7 +35,24 @@ class MininetNatEnvironment(object):
 
         self.sample_action = sample_action
 
+    def __run(self):
+        if self.started:
+            return
+
+        # start sender:
+        sys.stderr.write('Starting sender...\n')
+        self.sender = Sender(self.ipc.get_port(), train=True)
+        self.sender.set_sample_action(self.sample_action)
+
+        ### FIXME check
+        # sender completes the handshake sent from receiver
+        self.sender.handshake()
+
+        self.started = True
+
     def rollout(self):
+        self.__run()
+
         print("MininetEnvironment.rollout")
         sys.stderr.write('Obtaining an episode from environment...\n')
 

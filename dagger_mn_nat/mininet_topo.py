@@ -8,9 +8,11 @@ import shutil
 import threading
 import project_root
 
+from mininet.cli import CLI
 from mininet.topo import Topo
 from mininet.net import Mininet
 from mininet.node import CPULimitedHost
+from mininet.nodelib import NAT
 from mininet.link import TCLink
 from mininet.util import dumpNodeConnections, pmonitor
 from mininet.log import setLogLevel
@@ -28,27 +30,44 @@ port = 5000
 number_of_episodes = 1000
 
 
-class TwoSwitchTopo(Topo):
-    def build(self, worker_hosts):
+class TrainingTopo(Topo):
+    def build(self, worker_hosts, ps_hosts, nat_ip):
         s1 = self.addSwitch('s1')
         s2 = self.addSwitch('s2')
+        s3 = self.addSwitch('s3')
+
+        nat1 = self.addNode('nat1', cls=NAT, ip=nat_ip, inNamespace=False)
+        self.addLink(nat1, s1)
 
         worker_cnt = len(worker_hosts)
         for i in range(worker_cnt):
-            worker_host = self.addHost('h{0}'.format(i), ip=worker_hosts[i]) # TODO subnet?
+#           worker_host = self.addHost('h{0}'.format(i), ip='{0}/8'.format(worker_hosts[i]), defaultRoute='via ' + nat_ip)
+            worker_host = self.addHost('h{0}'.format(i), ip='{0}/8'.format(worker_hosts[i]))
+            print(worker_host)
+#            for ps_host in ps_hosts:
+#                worker_host.cmd('ip route add {0} via {1}'.format(ps_host, nat_ip))
             self.addLink(worker_host, s1)
+            self.addLink(worker_host, s2)
+        for i in range(worker_cnt):
             receiver_host = self.addHost('h{0}'.format(worker_cnt - i))
-            self.addLink(receiver_host, s2)
+            self.addLink(receiver_host, s3)
 
         # TODO
         # 12 Mbps, 5ms delay, 1000 packet queue
-        self.addLink(s1, s2, bw=12, delay='5ms', max_queue_size=1000, use_htb=True)
+        self.addLink(s2, s3, bw=12, delay='5ms', max_queue_size=1000, use_htb=True)
+
+
+def strip_port(arg):
+    i = arg.rfind(':')
+    return arg[0:i]
 
 
 class Controller(object):
     def __init__(self, args):
         self.args = args
-        self.worker_hosts = args.worker_hosts.split(',')
+        self.worker_hosts = [strip_port(host) for host in args.local_worker_hosts.split(',')]
+        self.ps_hosts = [strip_port(host) for host in args.ps_hosts.split(',')]
+        print(self.worker_hosts)
         self.worker_cnt = len(self.worker_hosts)
         self.worker_ipc_objects = []
         self.worker_pids = []
@@ -71,8 +90,18 @@ class Controller(object):
 
     def setup_net(self):
         "Create network and run simple performance test"
-        topo = TwoSwitchTopo(self.worker_hosts)
+        topo = TrainingTopo(self.worker_hosts, self.ps_hosts, self.args.nat_ip)
         self.net = Mininet(topo=topo, link=TCLink)
+        # set up routing table
+        for i in range(self.worker_cnt):
+            worker_host = self.net.get('h{0}'.format(i))
+#            worker_host.cmd('ip route add default gw ' + self.args.nat_ip)
+#            for ps_host in self.ps_hosts:
+#                worker_host.cmd('ip route add {0} via {1} h{2}-eth1'.format(ps_host, self.args.nat_ip, i))
+            worker_host.cmd('ip route flush table main')
+            worker_host.cmd('ip route add {0}/32 dev h{1}-eth0'.format(self.args.nat_ip, i))
+            worker_host.cmd('ip route add 10.0.0.0/24 dev h{0}-eth1'.format(i)) # FIXME extract net address form self.args.nat_ip
+            worker_host.cmd('ip route add default via {0}'.format(self.args.nat_ip))
 
     def udpate_iperf_flows(self, new_flows):
         # terminate obsolete flows
@@ -119,9 +148,9 @@ class Controller(object):
                 self.resume_cv.notify_all()
 
     def run(self):
-        self.net.addNAT().configDefault()
+#        self.net.addNAT().configDefault()
         self.net.start()
-
+#        """
         self.start_workers()
         self.start_receivers()
 
@@ -130,6 +159,8 @@ class Controller(object):
                 break
             scenario = obtain_scenario(self.worker_cnt)
             self.scenario_loop(scenario)
+#        """
+#        CLI(self.net)
 
         print("run() stopping network")
         self.net.stop()
@@ -137,7 +168,7 @@ class Controller(object):
     def start_receivers(self):
         print("starting receivers...")
         for i in range(self.worker_cnt):
-            worker_host =self.net.get('h{0}'.format(i))
+            worker_host = self.net.get('h{0}'.format(i))
             receiver_host = self.net.get('h{0}'.format(self.worker_cnt - i))
             receiver_cmd = '../env/run_receiver.py %s %d &' % (str(worker_host.IP()), port)
             receiver_host.cmd(receiver_cmd)
@@ -148,12 +179,17 @@ class Controller(object):
         print("starting workers...")
         for i in range(self.worker_cnt):
             worker_host = self.net.get('h{0}'.format(i))
-            worker_cmd = './worker ' \
+#            full_worker_host_list = '{0},{1}'.format(self.args.local_worker_hosts, self.args.remote_worker_hosts)
+            full_worker_host_list = self.args.local_worker_hosts
+            if self.args.remote_worker_hosts:
+                full_worker_host_list += ',' + self.args.remote_worker_hosts
+            worker_cmd = './worker.py ' \
                          '--job-name worker ' \
-                         '--task-index {0} ' \
-                         '--ps-hosts {1} ' \
-                         '--worker-hosts {2}' \
-                         .format(self.args.task_index, self.args.ps_hosts, self.args.worker_hosts)
+                         '--worker-id {0} ' \
+                         '--task-index {1} ' \
+                         '--ps-hosts {2} ' \
+                         '--worker-hosts {3} >indigo-worker-out.txt 2>&1' \
+                         .format(i, self.args.task_index, self.args.ps_hosts, full_worker_host_list)
             print("worker_cmd: {0}".format(worker_cmd))
             # start worker
             worker_host.cmd(worker_cmd)
@@ -210,7 +246,12 @@ def main():
         '--ps-hosts', required=True, metavar='[HOSTNAME:PORT, ...]',
         help='comma-separated list of hostname:port of parameter servers')
     parser.add_argument(
-        '--worker-hosts', required=True, metavar='[HOSTNAME:PORT, ...]',
+        '--local-worker-hosts', required=True, metavar='[HOSTNAME:PORT, ...]',
+        help='comma-separated list of hostname:port of workers')
+    parser.add_argument(
+        '--nat-ip', required=True, metavar='<IPv4 address>')
+    parser.add_argument(
+        '--remote-worker-hosts', required=False, metavar='[HOSTNAME:PORT, ...]',
         help='comma-separated list of hostname:port of workers')
     parser.add_argument('--task-index', metavar='N', type=int, required=True,
                         help='index of task')
