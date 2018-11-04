@@ -15,9 +15,10 @@ class IpcData(Structure):
         ("cwnd", c_uint32), # set by the mn controller
         ("idle", c_bool),   # set by the mn controller
         ("port", c_uint16), # set by the mn controller
+        ("start_delay", c_uint32),
         ("task_id", c_uint32)]
 
-shm_fmt_str = '=I?HI'
+shm_fmt_str = '=I?HII'
 
 class IndigoIpcMininetView(object):
     def __init__(self, worker_id):
@@ -60,7 +61,7 @@ class IndigoIpcMininetView(object):
     def set_task_id(self, task_id):
         self.ipc_data.contents.task_id = task_id
     """
-    def handler_thread_fun(self):
+    def handler_thread_fun(self, params):
         while True:
             print('handler_thread loop')
             if not self.handler_fun:
@@ -69,7 +70,7 @@ class IndigoIpcMininetView(object):
             msg = self.mn_msg_q.receive()
             print('handler_thread msg: %s', str(msg))
             try:
-                self.handler_fun(msg[0])
+                self.handler_fun(msg[0], params)
             except:
                 sys.stderr.write('handler_thread_fun: %s' % sys.exc_info()[0])
 
@@ -77,7 +78,7 @@ class IndigoIpcMininetView(object):
         self.handler_fun = fun
         if not self.handler_thread:
             print('starting thread...')
-            self.handler_thread = thread.start_new_thread(self.handler_thread_fun, ())
+            self.handler_thread = thread.start_new_thread(self.handler_thread_fun, (params,))
 
     def get_message(self):
         return self.mn_msg_q.receive()[0]

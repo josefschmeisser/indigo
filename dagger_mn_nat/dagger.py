@@ -460,6 +460,7 @@ class DaggerWorker(object):
                 '[WORKER %d Ep %d]: enqueueing a sequence of data '
                 'into queue of size %d\n' %
                 (self.task_idx, self.curr_ep, queue_size))
+            sys.stdout.flush()
 
         # Enqueue a sequence of data into the training queue.
         self.sess.run(self.enqueue_train_op, feed_dict={
@@ -473,10 +474,12 @@ class DaggerWorker(object):
                 '[WORKER %d Ep %d]: finished queueing data. '
                 'queue size now %d\n' %
                 (self.task_idx, self.curr_ep, queue_size))
+            sys.stdout.flush()
 
         if debug:
             sys.stderr.write('[WORKER %d Ep %d]: waiting for server\n' %
                                 (self.task_idx, self.curr_ep))
+            sys.stdout.flush()
 
         # Let the leader dequeue EP_DONE
         time.sleep(0.5)

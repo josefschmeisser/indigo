@@ -1,0 +1,159 @@
+Starting job worker task 0
+2018-11-03 21:59:06.696693: I tensorflow/core/platform/cpu_feature_guard.cc:141] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+2018-11-03 21:59:06.698435: I tensorflow/core/distributed_runtime/rpc/grpc_channel.cc:215] Initialize GrpcChannelCache for job ps -> {0 -> 172.17.0.2:5555}
+2018-11-03 21:59:06.698476: I tensorflow/core/distributed_runtime/rpc/grpc_channel.cc:215] Initialize GrpcChannelCache for job worker -> {0 -> localhost:7777}
+2018-11-03 21:59:06.699560: I tensorflow/core/distributed_runtime/rpc/grpc_server_lib.cc:375] Started server with target: grpc://localhost:7777
+2018-11-03 21:59:06.982267: I tensorflow/core/distributed_runtime/master_session.cc:1165] Start master session ee5cf8fd4ac93a94 with config: allow_soft_placement: true
+[WORKER 0 Ep 0] Starting...
+DaggerWorker:global_network_cpu:cnt 0.0
+DaggerWorker:local_network:cnt 0.0
+Starting sender...
+[sender] Listening on port 5555
+[sender] Handshake success! Receiver's address is 10.0.0.2:43449
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 0]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 0]: finished queueing data. queue size now 1
+[WORKER 0 Ep 0]: waiting for server
+[WORKER 0 Ep 1] Starting...
+DaggerWorker:global_network_cpu:cnt 1.0
+DaggerWorker:local_network:cnt 1.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 1]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 1]: finished queueing data. queue size now 1
+[WORKER 0 Ep 1]: waiting for server
+[WORKER 0 Ep 2] Starting...
+DaggerWorker:global_network_cpu:cnt 2.0
+DaggerWorker:local_network:cnt 2.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 2]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 2]: finished queueing data. queue size now 1
+[WORKER 0 Ep 2]: waiting for server
+[WORKER 0 Ep 3] Starting...
+DaggerWorker:global_network_cpu:cnt 3.0
+DaggerWorker:local_network:cnt 3.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 3]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 3]: finished queueing data. queue size now 1
+[WORKER 0 Ep 3]: waiting for server
+[WORKER 0 Ep 4] Starting...
+DaggerWorker:global_network_cpu:cnt 4.0
+DaggerWorker:local_network:cnt 4.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 4]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 4]: finished queueing data. queue size now 1
+[WORKER 0 Ep 4]: waiting for server
+[WORKER 0 Ep 5] Starting...
+DaggerWorker:global_network_cpu:cnt 5.0
+DaggerWorker:local_network:cnt 5.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 5]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 5]: finished queueing data. queue size now 1
+[WORKER 0 Ep 5]: waiting for server
+[WORKER 0 Ep 6] Starting...
+DaggerWorker:global_network_cpu:cnt 6.0
+DaggerWorker:local_network:cnt 6.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 6]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 6]: finished queueing data. queue size now 1
+[WORKER 0 Ep 6]: waiting for server
+[WORKER 0 Ep 7] Starting...
+DaggerWorker:global_network_cpu:cnt 7.0
+DaggerWorker:local_network:cnt 7.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 7]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 7]: finished queueing data. queue size now 1
+[WORKER 0 Ep 7]: waiting for server
+[WORKER 0 Ep 8] Starting...
+DaggerWorker:global_network_cpu:cnt 8.0
+DaggerWorker:local_network:cnt 8.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 8]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 8]: finished queueing data. queue size now 1
+[WORKER 0 Ep 8]: waiting for server
+[WORKER 0 Ep 9] Starting...
+DaggerWorker:global_network_cpu:cnt 9.0
+DaggerWorker:local_network:cnt 9.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 9]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 9]: finished queueing data. queue size now 1
+[WORKER 0 Ep 9]: waiting for server
+[WORKER 0 Ep 10] Starting...
+DaggerWorker:global_network_cpu:cnt 10.0
+DaggerWorker:local_network:cnt 10.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 10]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 10]: finished queueing data. queue size now 1
+[WORKER 0 Ep 10]: waiting for server
+[WORKER 0 Ep 11] Starting...
+DaggerWorker:global_network_cpu:cnt 11.0
+DaggerWorker:local_network:cnt 11.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 11]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 11]: finished queueing data. queue size now 1
+[WORKER 0 Ep 11]: waiting for server
+[WORKER 0 Ep 12] Starting...
+DaggerWorker:global_network_cpu:cnt 12.0
+DaggerWorker:local_network:cnt 12.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 12]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 12]: finished queueing data. queue size now 1
+[WORKER 0 Ep 12]: waiting for server
+[WORKER 0 Ep 13] Starting...
+DaggerWorker:global_network_cpu:cnt 13.0
+DaggerWorker:local_network:cnt 13.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 13]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 13]: finished queueing data. queue size now 1
+[WORKER 0 Ep 13]: waiting for server
+[WORKER 0 Ep 14] Starting...
+DaggerWorker:global_network_cpu:cnt 14.0
+DaggerWorker:local_network:cnt 14.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 14]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 14]: finished queueing data. queue size now 1
+[WORKER 0 Ep 14]: waiting for server
+[WORKER 0 Ep 15] Starting...
+DaggerWorker:global_network_cpu:cnt 15.0
+DaggerWorker:local_network:cnt 15.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished
+[WORKER 0 Ep 15]: enqueueing a sequence of data into queue of size 0
+[WORKER 0 Ep 15]: finished queueing data. queue size now 1
+[WORKER 0 Ep 15]: waiting for server
+[WORKER 0 Ep 16] Starting...
+DaggerWorker:global_network_cpu:cnt 16.0
+DaggerWorker:local_network:cnt 16.0
+Obtaining an episode from environment...
+MininetEnvironment.rollout
+wait_for_reset finished

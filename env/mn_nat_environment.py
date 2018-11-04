@@ -41,7 +41,7 @@ class MininetNatEnvironment(object):
 
         # start sender:
         sys.stderr.write('Starting sender...\n')
-        self.sender = Sender(self.ipc.get_port(), train=True)
+        self.sender = Sender(self.ipc.get_port(), train=True, debug=True)
         self.sender.set_sample_action(self.sample_action)
 
         ### FIXME check

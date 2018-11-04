@@ -26,7 +26,7 @@ from helpers.nat_ipc import IndigoIpcMininetView
 from dagger_mn_nat.scenarios import obtain_scenario, Scenario
 
 
-port = 5000
+port = 5555
 number_of_episodes = 1000
 
 
@@ -80,7 +80,6 @@ class Controller(object):
             ipc.set_handler_fun(self.handle_request, (i, ipc))
             self.worker_ipc_objects.append(ipc)
 
-        self.lock = threading.Lock()
         self.resume_cv = threading.Condition()
 
         self.rollout_requests = 0
@@ -135,17 +134,19 @@ class Controller(object):
             for i in range(self.worker_cnt):
                 ipc = self.worker_ipc_objects[i]
                 ipc.set_cwnd(scenario.get_cwnd())
-                ipc.set_idle_state(active_workers[i])
-
+                ipc.set_idle_state(not active_workers[i])
+# FIXME division by zero when idle==True
             time.sleep(0.5) # TODO
 
-            notify = False
-            with self.lock:
-                notify = self.rollout_requests == self.worker_cnt
-                if notify:
-                    self.worker_cnt = 0
+#            print('scenario_loop: checking rollout requests...')
+            self.resume_cv.acquire()
+            notify = self.rollout_requests == self.worker_cnt
+#            print('scenario_loop: checking rollout requests - notify: %d' % notify)
             if notify:
+                print('notifying workers...')
+                self.rollout_requests = 0
                 self.resume_cv.notify_all()
+            self.resume_cv.release()
 
     def run(self):
 #        self.net.addNAT().configDefault()
@@ -188,7 +189,7 @@ class Controller(object):
                          '--worker-id {0} ' \
                          '--task-index {1} ' \
                          '--ps-hosts {2} ' \
-                         '--worker-hosts {3} >indigo-worker-out.txt 2>&1' \
+                         '--worker-hosts {3} >indigo-worker-out.txt 2>&1 &' \
                          .format(i, self.args.task_index, self.args.ps_hosts, full_worker_host_list)
             print("worker_cmd: {0}".format(worker_cmd))
             # start worker
@@ -215,22 +216,28 @@ class Controller(object):
         for ipc in self.worker_ipc_objects:
             ipc.finalize_rollout_request()
 
-    def handle_rollout_request(self):
-        with self.lock:
-            self.rollout_requests += 1
+    def handle_rollout_request(self, ipc):
+        self.resume_cv.acquire()
+        self.rollout_requests += 1
+        print('waiting on cv')
         self.resume_cv.wait()
+        self.resume_cv.release()
+        print('rollout request handler finished')
+        ipc.finalize_rollout_request()
 
     def handle_cleanup_request(self):
         self.stop = True
         self.stop_workers()
         self.stop_receivers()
 
-    def handle_request(self, request):
+    def handle_request(self, request, params):
         try:
-            print('in handle_request()')
+            worker_idx = params[0]
+            worker_ipc = params[1]
+            print('in handle_request() - params %s' % str(params))
             print("received request: %s" % str(request))
             if request == 'rollout':
-                self.handle_rollout_request()
+                self.handle_rollout_request(worker_ipc)
             elif request == 'cleanup':
                 self.handle_cleanup_request()
             else:
