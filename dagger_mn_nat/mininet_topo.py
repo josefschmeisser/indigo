@@ -23,10 +23,10 @@ from multiprocessing import Process
 
 from helpers.nat_ipc import IndigoIpcMininetView
 
-from dagger_mn_nat.scenarios import obtain_scenario, Scenario
+from dagger_mn_nat.scenarios import Scenario, calculate_cwnd
 
 
-port = 5555
+#port = 5555
 number_of_episodes = 1000
 
 
@@ -70,8 +70,8 @@ class Controller(object):
         print(self.worker_hosts)
         self.worker_cnt = len(self.worker_hosts)
         self.worker_ipc_objects = []
-        self.worker_pids = []
-        self.receiver_pids = []
+        self.worker_pids = [None] * self.worker_cnt
+        self.receiver_pids = [None] * self.worker_cnt
 
         self.active_flows = []
 
@@ -118,6 +118,9 @@ class Controller(object):
             pid = int(host.cmd('echo $!'))
             self.active_flows.append((flow, pid))
 
+    def update_indigo_flows(self, scenario_indigo_flows):
+        pass # TODO
+
     def adjust_network_parameters(self, scenario):
         pass # TODO
 
@@ -125,16 +128,23 @@ class Controller(object):
         while not self.stop:
             scenario.step()
 
-            new_flows = scenario.get_active_flows()
+            new_flows = scenario.get_active_iperf_flows()
             self.udpate_iperf_flows(new_flows)
+
+            scenario_indigo_flows = scenario.get_indigo_flows()
+            self.update_indigo_flows(scenario_indigo_flows)
 
             self.adjust_network_parameters(scenario)
 
-            active_workers = scenario.get_active_workers()
-            for i in range(self.worker_cnt):
-                ipc = self.worker_ipc_objects[i]
-                ipc.set_cwnd(scenario.get_cwnd())
-                ipc.set_idle_state(not active_workers[i])
+            for worker_idx in range(self.worker_cnt):
+                ipc = self.worker_ipc_objects[worker_idx]
+                # update cwnd
+#                ipc.set_cwnd(scenario.get_cwnd())
+                min_rtt = ipc.get_min_rtt()
+                if min_rtt == 0:
+                    pass # TODO use the given delay*2
+                calculate_cwnd(scenario, worker_idx, min_rtt)
+
 # FIXME division by zero when idle==True
             time.sleep(0.5) # TODO
 
@@ -146,41 +156,54 @@ class Controller(object):
                 print('notifying workers...')
                 self.rollout_requests = 0
                 self.resume_cv.notify_all()
+                self.resume_cv.release()
+                return
             self.resume_cv.release()
 
     def run(self):
-#        self.net.addNAT().configDefault()
         self.net.start()
-#        """
         self.start_workers()
-        self.start_receivers()
 
         for _ in range(number_of_episodes):
             if self.stop:
                 break
             scenario = obtain_scenario(self.worker_cnt)
+            # set up worker parameters
+            active_workers = scenario.get_active_worker_vector()
+            indigo_flows = scenario.get_indigo_flows()
+            for i in range(self.worker_cnt):
+                indigo_flow = indigo_flows[i]
+                ipc = self.worker_ipc_objects[i]
+                ipc.set_cwnd(scenario.get_cwnd())
+                ipc.set_idle_state(not active_workers[i])
+                ipc.set_start_delay(indigo_flow.start_delay)
+
             self.scenario_loop(scenario)
-#        """
+
 #        CLI(self.net)
 
         print("run() stopping network")
         self.net.stop()
 
+    def start_receiver(self, worker_idx):
+        ipc = self.worker_ipc_objects[worker_idx]
+        port = ipc.get_port()
+        worker_host = self.net.get('h{0}'.format(worker_idx))
+        receiver_host = self.net.get('h{0}'.format(self.worker_cnt - worker_idx))
+        receiver_cmd = '../env/run_receiver.py %s %d &' % (str(worker_host.IP()), port)
+        receiver_host.cmd(receiver_cmd)
+        receiver_pid = int(receiver_host.cmd('echo $!'))
+        self.receiver_pids[worker_idx] = receiver_pid
+
     def start_receivers(self):
         print("starting receivers...")
         for i in range(self.worker_cnt):
-            worker_host = self.net.get('h{0}'.format(i))
-            receiver_host = self.net.get('h{0}'.format(self.worker_cnt - i))
-            receiver_cmd = '../env/run_receiver.py %s %d &' % (str(worker_host.IP()), port)
-            receiver_host.cmd(receiver_cmd)
-            receiver_pid = int(receiver_host.cmd('echo $!'))
-            self.receiver_pids.append(receiver_pid)
+            self.start_receiver(i)
 
     def start_workers(self):
         print("starting workers...")
         for i in range(self.worker_cnt):
             worker_host = self.net.get('h{0}'.format(i))
-#            full_worker_host_list = '{0},{1}'.format(self.args.local_worker_hosts, self.args.remote_worker_hosts)
             full_worker_host_list = self.args.local_worker_hosts
             if self.args.remote_worker_hosts:
                 full_worker_host_list += ',' + self.args.remote_worker_hosts
@@ -195,20 +218,29 @@ class Controller(object):
             # start worker
             worker_host.cmd(worker_cmd)
             worker_pid = int(worker_host.cmd('echo $!'))
-            self.worker_pids.append(worker_pid)
+            self.worker_pids[i] = worker_pid
             print("worker started")
+
+    def stop_receiver(self, worker_idx):
+        if self.receiver_pids[worker_idx] is None:
+            return
+        receiver_host = self.net.get('h{0}'.format(self.worker_cnt - worker_idx))
+        receiver_host.cmd('kill', self.receiver_pids[worker_idx])
+        self.receiver_pids[worker_idx] = None
 
     def stop_receivers(self):
         for i in range(self.worker_cnt):
-            receiver_host = self.net.get('h{0}'.format(self.worker_cnt - i))
-            receiver_host.cmd('kill', self.receiver_pids[i])
-        self.receiver_pids = []
+            self.stop_receiver(i)
 
     def stop_workers(self):
         for i in range(self.worker_cnt):
             worker_host = self.net.get('h{0}'.format(i))
             worker_host.cmd('kill', self.worker_pids[i])
-        self.worker_pids = []
+            self.worker_pids[i] = None
+
+    def restart_receiver(self, worker_idx):
+        self.stop_receiver(worker_idx)
+        self.start_receiver(worker_idx)
 
     def rollout(self):
         # TODO wait until the queues are empty
@@ -216,12 +248,14 @@ class Controller(object):
         for ipc in self.worker_ipc_objects:
             ipc.finalize_rollout_request()
 
-    def handle_rollout_request(self, ipc):
+    def handle_rollout_request(self, worker_idx, ipc):
         self.resume_cv.acquire()
         self.rollout_requests += 1
         print('waiting on cv')
         self.resume_cv.wait()
         self.resume_cv.release()
+        # clear receiver state
+        self.restart_receiver(worker_idx)
         print('rollout request handler finished')
         ipc.finalize_rollout_request()
 
@@ -237,7 +271,7 @@ class Controller(object):
             print('in handle_request() - params %s' % str(params))
             print("received request: %s" % str(request))
             if request == 'rollout':
-                self.handle_rollout_request(worker_ipc)
+                self.handle_rollout_request(worker_idx, worker_ipc)
             elif request == 'cleanup':
                 self.handle_cleanup_request()
             else:

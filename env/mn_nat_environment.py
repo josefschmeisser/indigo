@@ -25,33 +25,31 @@ class MininetNatEnvironment(object):
 
         self.ipc = IndigoIpcWorkerView(worker_id)
 
-        self.started = False
-
-    def cleanup(self):
-        pass # TODO stop sender
-
     def set_sample_action(self, sample_action):
         """Set the sender's policy. Must be called before calling reset()."""
 
         self.sample_action = sample_action
 
-    def __run(self):
-        if self.started:
-            return
+    def __cleanup(self):
+        if self.sender:
+            self.sender.cleanup()
+            self.sender = None
+
+    def __start_sender(self):
+        self.port = get_open_udp_port()
+        self.ipc.set_port(port)
 
         # start sender:
         sys.stderr.write('Starting sender...\n')
-        self.sender = Sender(self.ipc.get_port(), train=True, debug=True)
+        self.sender = Sender(self.port, train=True, debug=True)
         self.sender.set_sample_action(self.sample_action)
 
-        ### FIXME check
         # sender completes the handshake sent from receiver
         self.sender.handshake()
 
-        self.started = True
-
     def rollout(self):
-        self.__run()
+        self.__cleanup()
+        self.__start_sender()
 
         print("MininetEnvironment.rollout")
         sys.stderr.write('Obtaining an episode from environment...\n')
@@ -61,6 +59,9 @@ class MininetNatEnvironment(object):
         print("wait_for_reset finished")
         sys.stdout.flush()
 
+        start_delay = self.ipc.get_start_delay()
+        if start_delay > 0:
+            time.sleep(1e-3*start_delay)
         self.sender.run()
 
     def get_best_cwnd(self):

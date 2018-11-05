@@ -12,13 +12,15 @@ from mmap import PROT_WRITE, PROT_READ, MAP_SHARED
 
 class IpcData(Structure):
     _fields_ = [
-        ("cwnd", c_uint32), # set by the mn controller
-        ("idle", c_bool),   # set by the mn controller
-        ("port", c_uint16), # set by the mn controller
-        ("start_delay", c_uint32),
+        ("port", c_uint16),        # set by the worker
+        ("min_rtt", c_uint32),     # set by the worker
+        ("cwnd", c_uint32),        # set by the mn controller
+        ("idle", c_bool),          # set by the mn controller
+        ("start_delay", c_uint32), # in ms
+        ("max_steps", c_uint32),
         ("task_id", c_uint32)]
 
-shm_fmt_str = '=I?HII'
+shm_fmt_str = '=HII?III'
 
 class IndigoIpcMininetView(object):
     def __init__(self, worker_id):
@@ -42,7 +44,6 @@ class IndigoIpcMininetView(object):
 
         # set some initial values
         self.ipc_data.contents.cwnd = 5
-        self.ipc_data.contents.port = 5555
 
         self.handler_thread = None
 
@@ -55,12 +56,15 @@ class IndigoIpcMininetView(object):
     def set_idle_state(self, idle):
         self.ipc_data.contents.idle = idle
 
-    def set_port(self, port):
-        self.ipc_data.contents.port = port
+    def get_port(self):
+        return self.ipc_data.contents.port
     """
     def set_task_id(self, task_id):
         self.ipc_data.contents.task_id = task_id
     """
+    def set_start_delay(self, delay):
+        self.ipc_data.contents.start_delay = delay
+
     def handler_thread_fun(self, params):
         while True:
             print('handler_thread loop')
@@ -108,6 +112,9 @@ class IndigoIpcWorkerView(object):
         # cast
         self.ipc_data = cast(self.ptr, POINTER(IpcData))
 
+        # set some initial values
+        self.ipc_data.contents.min_rtt = 0
+
         # message queues
         self.mn_msg_q = posix_ipc.MessageQueue('/indigo_mn_msg_q_worker_%d' % worker_id, posix_ipc.O_CREAT)
         self.worker_msq_q = posix_ipc.MessageQueue('/indigo_worker_msg_q_worker_%d' % worker_id, posix_ipc.O_CREAT)
@@ -121,8 +128,11 @@ class IndigoIpcWorkerView(object):
     def get_idle_state(self):
         return self.ipc_data.contents.idle
 
-    def get_port(self):
-        return self.ipc_data.contents.port
+    def set_port(self, port):
+        self.ipc_data.contents.port = port
+
+    def get_start_delay(self):
+        return self.ipc_data.contents.start_delay
 
     def send_rollout_request(self):
         self.mn_msg_q.send('rollout')
