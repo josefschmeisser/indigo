@@ -2,7 +2,10 @@ import numpy as np
 import collections
 #from recordtype import recordtype
 
-iPerfFlow = collections.namedtuple('iPerfFlow', 'host_idx start_ts bw')
+packet_size = 1600 # (in bytes) TODO check
+cwnd_correction_factor = 0.95
+
+iPerfFlow = collections.namedtuple('iPerfFlow', 'host_idx start_ts bw proto linux_congestion')
 IndigoFlow = collections.namedtuple('IndigoFlow', 'host_idx active start_delay initial_link_delay current_link_delay')
 
 class Scenario(object):
@@ -83,15 +86,25 @@ class Scenario(object):
     def get_active_iperf_flows(self):
         return self.iperf_flows
 
+    # in Mbps
+    def get_bandwidth(self):
+        return self.bw
+
     def get_loss_rate(self):
         return self.loss_rate
 
     def get_active_worker_vector(self):
         return self.worker_vec
 
-    def get_indigo_flows(self, worker_idx):
+    def get_indigo_flows(self):
         return self.indigo_flows
 
 
+# TODO check
+# min_rtt in ms
 def calculate_cwnd(scenario, worker_idx, min_rtt):
-    pass
+    bw = scenario.get_bandwidth() * 1e6 / 8 / 1e3 # [bytes/ms]
+    cwnd = bw*min_rtt
+    cwnd *= cwnd_correction_factor
+    cwnd = np.floor(cwnd)
+    return cwnd

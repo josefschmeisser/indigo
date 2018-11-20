@@ -37,7 +37,7 @@ class MininetNatEnvironment(object):
 
     def __start_sender(self):
         self.port = get_open_udp_port()
-        self.ipc.set_port(port)
+        self.ipc.set_port(self.port)
 
         # start sender:
         sys.stderr.write('Starting sender...\n')

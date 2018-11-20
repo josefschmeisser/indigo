@@ -32,9 +32,9 @@ number_of_episodes = 1000
 
 class TrainingTopo(Topo):
     def build(self, worker_hosts, ps_hosts, nat_ip):
-        s1 = self.addSwitch('s1')
-        s2 = self.addSwitch('s2')
-        s3 = self.addSwitch('s3')
+        s1 = self.addSwitch('s1') # nat switch
+        s2 = self.addSwitch('s2') # workers are connected to this switch
+        s3 = self.addSwitch('s3') # receiver are connected to this switch
 
         nat1 = self.addNode('nat1', cls=NAT, ip=nat_ip, inNamespace=False)
         self.addLink(nat1, s1)
@@ -73,8 +73,6 @@ class Controller(object):
         self.worker_pids = [None] * self.worker_cnt
         self.receiver_pids = [None] * self.worker_cnt
 
-        self.active_flows = []
-
         for i in range(self.worker_cnt):
             ipc = IndigoIpcMininetView(i)
             ipc.set_handler_fun(self.handle_request, (i, ipc))
@@ -104,7 +102,7 @@ class Controller(object):
 
     def udpate_iperf_flows(self, new_flows):
         # terminate obsolete flows
-        for flow, pid in self.active_flows:
+        for flow, pid in self.active_iperf_flows:
             if not flow in new_flows:
                 host = self.net.get(flow.host_name)
                 host.cmd('kill', pid)
@@ -116,15 +114,60 @@ class Controller(object):
             perf_cmd = '' # TODO cmd
             host.cmd(perf_cmd)
             pid = int(host.cmd('echo $!'))
-            self.active_flows.append((flow, pid))
+            self.active_iperf_flows.append((flow, pid))
 
     def update_indigo_flows(self, scenario_indigo_flows):
-        pass # TODO
+        if self.current_indigo_flows is None:
+            self.current_indigo_flows = scenario_indigo_flows
+            return
+
+        # update flows
+        for worker_idx in range(self.worker_cnt):
+            current_flow = self.current_indigo_flows[worker_idx]
+            scenario_flow = scenario_indigo_flows[worker_idx]
+            if current_flow == scenario_flow:
+                continue
+            # update current_link_delay (the only mutable attribute at the present time)
+            if current_flow.current_link_delay != scenario_flow.current_link_delay:
+                pass # TODO
+            self.current_indigo_flows[worker_idx] = scenario_flow
 
     def adjust_network_parameters(self, scenario):
+        new_bw = scenario.get_bandwidth()
+        new_loss_rate = scenario.get_loss_rate()
+
+        # tc qdisc add dev eth0 root tbf rate 1024kbit
+        # limit the outgoing traffic on the worker side
+        worker_switch = self.net.get('s2')
+        worker_switch.cmd() # TODO
+
+        receiver_switch = self.net.get('s3')
+        receiver_switch.cmd() # TODO
+
+        for i in range(self.worker_cnt):
+            worker_host = self.net.get('h{0}'.format(i))
+            current_flow = self.current_indigo_flows[worker_idx]
+            # update individual delays
+            worker_host.cmd('tc ...  h{0}-eth1'.format(i)) # TODO
+            # TODO
+
         pass # TODO
 
+    def update_cwnd_values(self, scenario):
+        for worker_idx in range(self.worker_cnt):
+            ipc = self.worker_ipc_objects[worker_idx]
+            min_rtt = ipc.get_min_rtt()
+            # min_rtt == 0 => min_rtt = initial_link_delay*2
+            if min_rtt == 0:
+                current_flow = self.current_indigo_flows[worker_idx]
+                min_rtt = current_flow.initial_link_delay*2
+            cwnd = calculate_cwnd(scenario, worker_idx, min_rtt)
+            ipc.set_cwnd(cwnd)
+
     def scenario_loop(self, scenario):
+        self.current_indigo_flows = None
+        self.active_iperf_flows = []
+
         while not self.stop:
             scenario.step()
 
@@ -136,14 +179,7 @@ class Controller(object):
 
             self.adjust_network_parameters(scenario)
 
-            for worker_idx in range(self.worker_cnt):
-                ipc = self.worker_ipc_objects[worker_idx]
-                # update cwnd
-#                ipc.set_cwnd(scenario.get_cwnd())
-                min_rtt = ipc.get_min_rtt()
-                if min_rtt == 0:
-                    pass # TODO use the given delay*2
-                calculate_cwnd(scenario, worker_idx, min_rtt)
+            self.update_cwnd_values(scenario)
 
 # FIXME division by zero when idle==True
             time.sleep(0.5) # TODO
@@ -162,21 +198,24 @@ class Controller(object):
 
     def run(self):
         self.net.start()
+
+        CLI(self.net)
+
         self.start_workers()
 
         for _ in range(number_of_episodes):
             if self.stop:
                 break
-            scenario = obtain_scenario(self.worker_cnt)
+            scenario = Scenario(self.worker_cnt)
             # set up worker parameters
             active_workers = scenario.get_active_worker_vector()
             indigo_flows = scenario.get_indigo_flows()
             for i in range(self.worker_cnt):
                 indigo_flow = indigo_flows[i]
                 ipc = self.worker_ipc_objects[i]
-                ipc.set_cwnd(scenario.get_cwnd())
                 ipc.set_idle_state(not active_workers[i])
                 ipc.set_start_delay(indigo_flow.start_delay)
+            self.update_cwnd_values(scenario)
 
             self.scenario_loop(scenario)
 

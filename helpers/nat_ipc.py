@@ -17,7 +17,7 @@ class IpcData(Structure):
         ("cwnd", c_uint32),        # set by the mn controller
         ("idle", c_bool),          # set by the mn controller
         ("start_delay", c_uint32), # in ms
-        ("max_steps", c_uint32),
+        ("timeout", c_uint32),     # in ms
         ("task_id", c_uint32)]
 
 shm_fmt_str = '=HII?III'
