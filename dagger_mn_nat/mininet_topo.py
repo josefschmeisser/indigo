@@ -92,9 +92,6 @@ class Controller(object):
         # set up routing table
         for i in range(self.worker_cnt):
             worker_host = self.net.get('h{0}'.format(i))
-#            worker_host.cmd('ip route add default gw ' + self.args.nat_ip)
-#            for ps_host in self.ps_hosts:
-#                worker_host.cmd('ip route add {0} via {1} h{2}-eth1'.format(ps_host, self.args.nat_ip, i))
             worker_host.cmd('ip route flush table main')
             worker_host.cmd('ip route add {0}/32 dev h{1}-eth0'.format(self.args.nat_ip, i))
             worker_host.cmd('ip route add 10.0.0.0/24 dev h{0}-eth1'.format(i)) # FIXME extract net address form self.args.nat_ip
@@ -133,25 +130,28 @@ class Controller(object):
             self.current_indigo_flows[worker_idx] = scenario_flow
 
     def adjust_network_parameters(self, scenario):
-        new_bw = scenario.get_bandwidth()
-        new_loss_rate = scenario.get_loss_rate()
+        # TODO set burst rate?
+        # TODO tbf vs netem
+        new_bw = scenario.get_bandwidth() # [Mbps]
 
-        # tc qdisc add dev eth0 root tbf rate 1024kbit
+        new_loss_rate = scenario.get_loss_rate()
+        loss_arg = ''
+        if new_loss_rate > 0.0:
+            loss_arg = 'loss {0}%'.format(new_loss_rate*100.0)
+
         # limit the outgoing traffic on the worker side
         worker_switch = self.net.get('s2')
-        worker_switch.cmd() # TODO
+        worker_switch.cmd('tc qdisc change dev eth0 root netem {0} rate {1}mbit'.format(loss_arg, new_bw))
 
+        # TODO same settings?
         receiver_switch = self.net.get('s3')
-        receiver_switch.cmd() # TODO
+        receiver_switch.cmd('tc qdisc change dev eth0 root netem {0} rate {1}mbit'.format(loss_arg, new_bw))
 
-        for i in range(self.worker_cnt):
-            worker_host = self.net.get('h{0}'.format(i))
+        for worker_idx in range(self.worker_cnt):
+            worker_host = self.net.get('h{0}'.format(worker_idx))
             current_flow = self.current_indigo_flows[worker_idx]
             # update individual delays
-            worker_host.cmd('tc ...  h{0}-eth1'.format(i)) # TODO
-            # TODO
-
-        pass # TODO
+            worker_host.cmd('tc qdisc add dev h{0}-eth1 root tbf latency {1}'.format(worker_idx, current_flow.current_link_delay)) # TODO
 
     def update_cwnd_values(self, scenario):
         for worker_idx in range(self.worker_cnt):

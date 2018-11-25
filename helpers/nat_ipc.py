@@ -134,6 +134,12 @@ class IndigoIpcWorkerView(object):
     def get_start_delay(self):
         return self.ipc_data.contents.start_delay
 
+    def get_timeout(self):
+        return self.ipc_data.contents.timeout
+
+    def set_min_rtt(self, min_rtt):
+        self.ipc_data.contents.min_rtt = min_rtt
+
     def send_rollout_request(self):
         self.mn_msg_q.send('rollout')
 

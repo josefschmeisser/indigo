@@ -25,9 +25,11 @@ def format_actions(action_list):
 
 class Sender(object):
     # RL exposed class/static variables
-    max_steps = 1000
+#    max_steps = 1000
+    training_timeout_ms = 1000 # ms
+    start_ts_ms = 0
     state_dim = 4
-    action_mapping = format_actions(["/2.0", "-10.0", "+0.0", "+10.0", "*2.0"])
+    action_mapping = format_actions(["/2.0", "-10.0", "+0.0", "+10.0", "*2.0"]) # TODO new actions
     action_cnt = len(action_mapping)
 
     def __init__(self, port=0, train=False, debug=False):
@@ -223,7 +225,7 @@ class Sender(object):
             self.send_rate_ewma = None
 
             self.step_start_ms = curr_ts_ms()
-
+            """
             if self.train:
                 self.step_cnt += 1
                 if self.step_cnt >= Sender.max_steps:
@@ -231,9 +233,21 @@ class Sender(object):
                     self.running = False
 
                     self.compute_performance()
+            """
+            # new timeout system
+            if self.train:
+                runtime = self.step_start_ms - self.start_ts_ms
+                if runtime >= self.training_timeout_ms:
+                    self.step_cnt = 0
+                    self.running = False
 
-    def run(self):
-        TIMEOUT = 1000  # ms
+                    self.compute_performance()
+
+    def run(self, training_timeout_ms=0):
+        POOLING_TIMEOUT = 1000  # ms
+
+        self.training_timeout_ms = training_timeout_ms
+        self.start_ts_ms = curr_ts_ms()
 
         self.poller.modify(self.sock, ALL_FLAGS)
         curr_flags = ALL_FLAGS
@@ -249,7 +263,7 @@ class Sender(object):
                     self.poller.modify(self.sock, READ_ERR_FLAGS)
                     curr_flags = READ_ERR_FLAGS
 
-            events = self.poller.poll(TIMEOUT)
+            events = self.poller.poll(POOLING_TIMEOUT)
 
             if not events:  # timed out
                 self.send()

@@ -25,6 +25,11 @@ class MininetNatEnvironment(object):
 
         self.ipc = IndigoIpcWorkerView(worker_id)
 
+    def __sample_action_hook(self, state):
+        if self.sample_action:
+            self.sample_action(state)
+        self.ipc.set_min_rtt(self.sender.min_rtt)
+
     def set_sample_action(self, sample_action):
         """Set the sender's policy. Must be called before calling reset()."""
 
@@ -62,7 +67,7 @@ class MininetNatEnvironment(object):
         start_delay = self.ipc.get_start_delay()
         if start_delay > 0:
             time.sleep(1e-3*start_delay)
-        self.sender.run()
+        self.sender.run(training_timeout_ms=self.ipc.get_timeout())
 
     def get_best_cwnd(self):
         return self.ipc.get_cwnd()
