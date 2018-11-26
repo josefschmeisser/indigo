@@ -4,7 +4,7 @@ import collections
 
 packet_size = 1600 # (in bytes) TODO check
 cwnd_correction_factor = 0.95
-
+available_bandwidths = [5.0, 10.0, 12.0, 20.0]
 iPerfFlow = collections.namedtuple('iPerfFlow', 'host_idx start_ts bw proto linux_congestion')
 IndigoFlow = collections.namedtuple('IndigoFlow', 'host_idx active start_delay initial_link_delay current_link_delay')
 
@@ -12,7 +12,6 @@ class Scenario(object):
     def __init__(self, worker_cnt):
         self.worker_cnt = worker_cnt
         self.ts = 0
-
         self.bw = 12.0 # TODO
         self.loss_rate = 0.0
         self.queue_size = np.random.randint(500, 2000)

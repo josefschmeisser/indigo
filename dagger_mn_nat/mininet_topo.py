@@ -130,7 +130,7 @@ class Controller(object):
             self.current_indigo_flows[worker_idx] = scenario_flow
 
     def adjust_network_parameters(self, scenario):
-        # TODO set burst rate?
+        # TODO burst rate 1600b
         # TODO tbf vs netem
         new_bw = scenario.get_bandwidth() # [Mbps]
 
@@ -141,26 +141,24 @@ class Controller(object):
 
         # limit the outgoing traffic on the worker side
         worker_switch = self.net.get('s2')
+        # TODO use tbf rate
         worker_switch.cmd('tc qdisc change dev eth0 root netem {0} rate {1}mbit'.format(loss_arg, new_bw))
-
-        # TODO same settings?
-        receiver_switch = self.net.get('s3')
-        receiver_switch.cmd('tc qdisc change dev eth0 root netem {0} rate {1}mbit'.format(loss_arg, new_bw))
 
         for worker_idx in range(self.worker_cnt):
             worker_host = self.net.get('h{0}'.format(worker_idx))
             current_flow = self.current_indigo_flows[worker_idx]
             # update individual delays
-            worker_host.cmd('tc qdisc add dev h{0}-eth1 root tbf latency {1}'.format(worker_idx, current_flow.current_link_delay)) # TODO
+            # TODO netem delay
+            worker_host.cmd('tc qdisc add dev h{0}-eth1 root tbf latency {1}'.format(worker_idx, current_flow.current_link_delay))
 
     def update_cwnd_values(self, scenario):
         for worker_idx in range(self.worker_cnt):
             ipc = self.worker_ipc_objects[worker_idx]
             min_rtt = ipc.get_min_rtt()
-            # min_rtt == 0 => min_rtt = initial_link_delay*2
+            # min_rtt == 0 => min_rtt = initial_link_delay
             if min_rtt == 0:
                 current_flow = self.current_indigo_flows[worker_idx]
-                min_rtt = current_flow.initial_link_delay*2
+                min_rtt = current_flow.initial_link_delay
             cwnd = calculate_cwnd(scenario, worker_idx, min_rtt)
             ipc.set_cwnd(cwnd)
 

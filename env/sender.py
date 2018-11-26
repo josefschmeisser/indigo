@@ -29,7 +29,7 @@ class Sender(object):
     training_timeout_ms = 1000 # ms
     start_ts_ms = 0
     state_dim = 4
-    action_mapping = format_actions(["/2.0", "-10.0", "+0.0", "+10.0", "*2.0"]) # TODO new actions
+    action_mapping = format_actions(["*0.5", "*0.9", "+0.0", "*1.1", "*2.0"]) # TODO new actions
     action_cnt = len(action_mapping)
 
     def __init__(self, port=0, train=False, debug=False):
