@@ -25,13 +25,15 @@ from helpers.nat_ipc import IndigoIpcMininetView
 
 from dagger_mn_nat.scenarios import Scenario, calculate_cwnd
 
+from helpers.config import *
 
 #port = 5555
 number_of_episodes = 1000
 
 
 class TrainingTopo(Topo):
-    def build(self, worker_hosts, ps_hosts, nat_ip):
+#    def build(self, worker_hosts, ps_hosts, nat_ip):
+    def build(self, worker_hosts, nat_ip):
         s1 = self.addSwitch('s1') # nat switch
         s2 = self.addSwitch('s2') # workers are connected to this switch
         s3 = self.addSwitch('s3') # receiver are connected to this switch
@@ -63,12 +65,18 @@ def strip_port(arg):
 
 
 class Controller(object):
-    def __init__(self, args):
-        self.args = args
-        self.worker_hosts = [strip_port(host) for host in args.local_worker_hosts.split(',')]
-        self.ps_hosts = [strip_port(host) for host in args.ps_hosts.split(',')]
-        print(self.worker_hosts)
-        self.worker_cnt = len(self.worker_hosts)
+#    def __init__(self, args):
+#        self.args = args
+    def __init__(self):
+        self.config_section = config.get_our_section()
+        self.nat_ip = self.config_section['nat_ip']
+#        self.worker_hosts = [strip_port(host) for host in get_our_worker_list()]
+        self.our_worker_host_list = get_our_worker_list()
+        self.full_worker_host_list = get_full_worker_list()
+        self.ps_host_list = get_ps_host_list()
+#        self.ps_hosts = [strip_port(host) for host in get_ps_host_list()]
+        print(self.our_worker_host_list)
+        self.worker_cnt = len(self.our_worker_host_list)
         self.worker_ipc_objects = []
         self.worker_pids = [None] * self.worker_cnt
         self.receiver_pids = [None] * self.worker_cnt
@@ -87,15 +95,17 @@ class Controller(object):
 
     def setup_net(self):
         "Create network and run simple performance test"
-        topo = TrainingTopo(self.worker_hosts, self.ps_hosts, self.args.nat_ip)
+        worker_ip_list = [strip_port(host) for host in self.our_worker_host_list]
+        topo = TrainingTopo(worker_ip_list, self.nat_ip)
         self.net = Mininet(topo=topo, link=TCLink)
         # set up routing table
         for i in range(self.worker_cnt):
+            internal = '.'.join(self.nat_ip.split('.')[0:-1]) + '.0/24'
             worker_host = self.net.get('h{0}'.format(i))
             worker_host.cmd('ip route flush table main')
-            worker_host.cmd('ip route add {0}/32 dev h{1}-eth0'.format(self.args.nat_ip, i))
-            worker_host.cmd('ip route add 10.0.0.0/24 dev h{0}-eth1'.format(i)) # FIXME extract net address form self.args.nat_ip
-            worker_host.cmd('ip route add default via {0}'.format(self.args.nat_ip))
+            worker_host.cmd('ip route add {0}/32 dev h{1}-eth0'.format(self.nat_ip, i))
+            worker_host.cmd('ip route add {0} dev h{1}-eth1'.format(internal, i))
+            worker_host.cmd('ip route add default via {0}'.format(self.nat_ip))
 
     def udpate_iperf_flows(self, new_flows):
         # terminate obsolete flows
@@ -236,7 +246,7 @@ class Controller(object):
         print("starting receivers...")
         for i in range(self.worker_cnt):
             self.start_receiver(i)
-
+    """
     def start_workers(self):
         print("starting workers...")
         for i in range(self.worker_cnt):
@@ -251,6 +261,27 @@ class Controller(object):
                          '--ps-hosts {2} ' \
                          '--worker-hosts {3} >indigo-worker-out.txt 2>&1 &' \
                          .format(i, self.args.task_index, self.args.ps_hosts, full_worker_host_list)
+            print("worker_cmd: {0}".format(worker_cmd))
+            # start worker
+            worker_host.cmd(worker_cmd)
+            worker_pid = int(worker_host.cmd('echo $!'))
+            self.worker_pids[i] = worker_pid
+            print("worker started")
+    """
+    def start_workers(self):
+        print("starting workers...")
+        for i in range(self.worker_cnt):
+            worker_host = self.net.get('h{0}'.format(i))
+            worker_hosts_arg = ','.join(self.full_worker_host_list)
+            ps_hosts_arg = ','.join(self.ps_host_list)
+            task_index = self.config_section['task_index']
+            worker_cmd = './worker.py ' \
+                         '--job-name worker ' \
+                         '--worker-id {0} ' \
+                         '--task-index {1} ' \
+                         '--ps-hosts {2} ' \
+                         '--worker-hosts {3} >indigo-worker-out.txt 2>&1 &' \
+                         .format(i, task_index, ps_hosts_arg, worker_hosts_arg)
             print("worker_cmd: {0}".format(worker_cmd))
             # start worker
             worker_host.cmd(worker_cmd)
@@ -317,7 +348,7 @@ class Controller(object):
             e = sys.exc_info()[0]
             print('exception in handle_request(): %s' % str(e))
 
-
+"""
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -341,3 +372,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+"""

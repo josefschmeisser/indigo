@@ -42,20 +42,6 @@ class Scenario(object):
 
         ### TODO iperf flows
         self.iperf_flows = []
-        """
-        for worker_idx in range(worker_cnt):
-            if self.worker_vec[worker_idx]:
-                continue
-
-            do_start = 0.1 > np.random.random_sample()
-            if not do_start:
-                continue
-            self.active_flow_cnt += 1
-            self.iperf_flows.append(iPerfFlow(worker_idx, 0, 0))
-        per_flow_bw = self.bw / self.active_flow_cnt
-        for worker_idx in range(worker_cnt):
-            pass
-        """
         iperf_flow_vec = np.random.choice(a=[False, True], size=(worker_cnt), p=(0.9, 0.1))
         iperf_flow_vec = np.logical_and(np.logical_not(self.worker_vec), iperf_flow_vec)
         iperf_flow_cnt = np.count_nonzero(iperf_flow_vec)

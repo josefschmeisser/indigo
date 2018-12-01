@@ -1,0 +1,15 @@
+ps1:
+  role_type: 'ps'
+  address: '172.17.0.2:5000'
+  job_name: 'default'
+  task_index: 0
+
+mn1:
+  role_type: 'mn'
+  nat_ip: '10.0.0.254'
+  task_index: 0
+  workers:
+    - id: 0
+      address: '10.0.0.1:5001' # grpc port
+    - id: 1
+      address: '10.0.0.2:5001'
