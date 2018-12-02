@@ -145,21 +145,25 @@ class Controller(object):
         new_bw = scenario.get_bandwidth() # [Mbps]
 
         new_loss_rate = scenario.get_loss_rate()
-        loss_arg = ''
+        loss_arg = 'loss 0%'
         if new_loss_rate > 0.0:
             loss_arg = 'loss {0}%'.format(new_loss_rate*100.0)
 
         # limit the outgoing traffic on the worker side
         worker_switch = self.net.get('s2')
         # TODO use tbf rate
-        worker_switch.cmd('tc qdisc change dev eth0 root netem {0} rate {1}mbit'.format(loss_arg, new_bw))
+#        worker_switch.cmd('tc qdisc change dev eth0 root netem {0} rate {1}mbit'.format(loss_arg, new_bw))
+        worker_switch.cmd('tc qdisc change dev eth0 root netem {0}'.format(loss_arg))
+        worker_switch.cmd('tc qdisc add dev eth0 root tbf rate {1}mbit'.format(new_bw))
 
         for worker_idx in range(self.worker_cnt):
             worker_host = self.net.get('h{0}'.format(worker_idx))
             current_flow = self.current_indigo_flows[worker_idx]
             # update individual delays
             # TODO netem delay
-            worker_host.cmd('tc qdisc add dev h{0}-eth1 root tbf latency {1}'.format(worker_idx, current_flow.current_link_delay))
+#            worker_host.cmd('tc qdisc add dev h{0}-eth1 root tbf latency {1}'.format(worker_idx, current_flow.current_link_delay))
+            worker_host.cmd('tc qdisc add dev h{0}-eth1 root tbf burst 1600'.format(worker_idx))
+            worker_host.cmd('tc qdisc change dev h{0}-eth1 root netem delay {1}ms'.format(worker_idx, current_flow.current_link_delay))
 
     def update_cwnd_values(self, scenario):
         for worker_idx in range(self.worker_cnt):
