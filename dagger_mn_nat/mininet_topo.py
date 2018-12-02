@@ -16,23 +16,14 @@ from mininet.nodelib import NAT
 from mininet.link import TCLink
 from mininet.util import dumpNodeConnections, pmonitor
 from mininet.log import setLogLevel
-
 from multiprocessing import Process
-#from util.monitor import monitor_qlen, monitor_dropped # TODO
-
-
+from dagger_mn_nat.scenarios import Scenario, calculate_cwnd
+from helpers.config import config, get_full_worker_list, get_our_worker_list, get_ps_host_list
 from helpers.nat_ipc import IndigoIpcMininetView
 
-from dagger_mn_nat.scenarios import Scenario, calculate_cwnd
-
-from helpers.config import *
-
-#port = 5555
 number_of_episodes = 1000
 
-
 class TrainingTopo(Topo):
-#    def build(self, worker_hosts, ps_hosts, nat_ip):
     def build(self, worker_hosts, nat_ip):
         s1 = self.addSwitch('s1') # nat switch
         s2 = self.addSwitch('s2') # workers are connected to this switch
@@ -43,11 +34,8 @@ class TrainingTopo(Topo):
 
         worker_cnt = len(worker_hosts)
         for i in range(worker_cnt):
-#           worker_host = self.addHost('h{0}'.format(i), ip='{0}/8'.format(worker_hosts[i]), defaultRoute='via ' + nat_ip)
             worker_host = self.addHost('h{0}'.format(i), ip='{0}/8'.format(worker_hosts[i]))
             print(worker_host)
-#            for ps_host in ps_hosts:
-#                worker_host.cmd('ip route add {0} via {1}'.format(ps_host, nat_ip))
             self.addLink(worker_host, s1)
             self.addLink(worker_host, s2)
         for i in range(worker_cnt):
@@ -56,7 +44,8 @@ class TrainingTopo(Topo):
 
         # TODO
         # 12 Mbps, 5ms delay, 1000 packet queue
-        self.addLink(s2, s3, bw=12, delay='5ms', max_queue_size=1000, use_htb=True)
+#        self.addLink(s2, s3, bw=12, delay='5ms', max_queue_size=1000, use_htb=True)
+        self.addLink(s2, s3, use_htb=True)
 
 
 def strip_port(arg):
@@ -65,16 +54,12 @@ def strip_port(arg):
 
 
 class Controller(object):
-#    def __init__(self, args):
-#        self.args = args
     def __init__(self):
         self.config_section = config.get_our_section()
         self.nat_ip = self.config_section['nat_ip']
-#        self.worker_hosts = [strip_port(host) for host in get_our_worker_list()]
         self.our_worker_host_list = get_our_worker_list()
         self.full_worker_host_list = get_full_worker_list()
         self.ps_host_list = get_ps_host_list()
-#        self.ps_hosts = [strip_port(host) for host in get_ps_host_list()]
         print(self.our_worker_host_list)
         self.worker_cnt = len(self.our_worker_host_list)
         self.worker_ipc_objects = []
@@ -140,8 +125,6 @@ class Controller(object):
             self.current_indigo_flows[worker_idx] = scenario_flow
 
     def adjust_network_parameters(self, scenario):
-        # TODO burst rate 1600b
-        # TODO tbf vs netem
         new_bw = scenario.get_bandwidth() # [Mbps]
 
         new_loss_rate = scenario.get_loss_rate()
@@ -151,17 +134,12 @@ class Controller(object):
 
         # limit the outgoing traffic on the worker side
         worker_switch = self.net.get('s2')
-        # TODO use tbf rate
-#        worker_switch.cmd('tc qdisc change dev eth0 root netem {0} rate {1}mbit'.format(loss_arg, new_bw))
         worker_switch.cmd('tc qdisc change dev eth0 root netem {0}'.format(loss_arg))
         worker_switch.cmd('tc qdisc add dev eth0 root tbf rate {1}mbit'.format(new_bw))
 
         for worker_idx in range(self.worker_cnt):
             worker_host = self.net.get('h{0}'.format(worker_idx))
             current_flow = self.current_indigo_flows[worker_idx]
-            # update individual delays
-            # TODO netem delay
-#            worker_host.cmd('tc qdisc add dev h{0}-eth1 root tbf latency {1}'.format(worker_idx, current_flow.current_link_delay))
             worker_host.cmd('tc qdisc add dev h{0}-eth1 root tbf burst 1600'.format(worker_idx))
             worker_host.cmd('tc qdisc change dev h{0}-eth1 root netem delay {1}ms'.format(worker_idx, current_flow.current_link_delay))
 
@@ -250,28 +228,7 @@ class Controller(object):
         print("starting receivers...")
         for i in range(self.worker_cnt):
             self.start_receiver(i)
-    """
-    def start_workers(self):
-        print("starting workers...")
-        for i in range(self.worker_cnt):
-            worker_host = self.net.get('h{0}'.format(i))
-            full_worker_host_list = self.args.local_worker_hosts
-            if self.args.remote_worker_hosts:
-                full_worker_host_list += ',' + self.args.remote_worker_hosts
-            worker_cmd = './worker.py ' \
-                         '--job-name worker ' \
-                         '--worker-id {0} ' \
-                         '--task-index {1} ' \
-                         '--ps-hosts {2} ' \
-                         '--worker-hosts {3} >indigo-worker-out.txt 2>&1 &' \
-                         .format(i, self.args.task_index, self.args.ps_hosts, full_worker_host_list)
-            print("worker_cmd: {0}".format(worker_cmd))
-            # start worker
-            worker_host.cmd(worker_cmd)
-            worker_pid = int(worker_host.cmd('echo $!'))
-            self.worker_pids[i] = worker_pid
-            print("worker started")
-    """
+
     def start_workers(self):
         print("starting workers...")
         for i in range(self.worker_cnt):
@@ -351,29 +308,3 @@ class Controller(object):
         except:
             e = sys.exc_info()[0]
             print('exception in handle_request(): %s' % str(e))
-
-"""
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--ps-hosts', required=True, metavar='[HOSTNAME:PORT, ...]',
-        help='comma-separated list of hostname:port of parameter servers')
-    parser.add_argument(
-        '--local-worker-hosts', required=True, metavar='[HOSTNAME:PORT, ...]',
-        help='comma-separated list of hostname:port of workers')
-    parser.add_argument(
-        '--nat-ip', required=True, metavar='<IPv4 address>')
-    parser.add_argument(
-        '--remote-worker-hosts', required=False, metavar='[HOSTNAME:PORT, ...]',
-        help='comma-separated list of hostname:port of workers')
-    parser.add_argument('--task-index', metavar='N', type=int, required=True,
-                        help='index of task')
-    args = parser.parse_args()
-
-    controller = Controller(args)
-    controller.run()
-
-
-if __name__ == '__main__':
-    main()
-"""
