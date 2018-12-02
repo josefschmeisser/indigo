@@ -84,6 +84,9 @@ class Scenario(object):
     def get_indigo_flows(self):
         return self.indigo_flows
 
+    def get_queue_size(self):
+        return self.queue_size
+
 
 # TODO check
 # min_rtt in ms
