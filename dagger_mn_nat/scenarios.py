@@ -2,19 +2,28 @@ import numpy as np
 import collections
 #from recordtype import recordtype
 
+from helpers.config import config, get_full_worker_list, get_our_worker_list, get_ps_host_list
+
 packet_size = 1600 # (in bytes) TODO check
 cwnd_correction_factor = 0.95
 available_bandwidths = [5.0, 10.0, 12.0, 20.0]
 iPerfFlow = collections.namedtuple('iPerfFlow', 'host_idx start_ts bw proto linux_congestion')
-IndigoFlow = collections.namedtuple('IndigoFlow', 'host_idx active start_delay initial_link_delay current_link_delay')
+IndigoFlow = collections.namedtuple('IndigoFlow', 'host_idx active start_delay timeout initial_link_delay current_link_delay')
 
 class Scenario(object):
     def __init__(self, worker_cnt):
         self.worker_cnt = worker_cnt
+
+        self.scenario_config = config.get_our_section()['scenario']
+
         self.ts = 0
         self.bw = 12.0 # TODO
         self.loss_rate = 0.0
         self.queue_size = np.random.randint(500, 2000)
+        # config
+        self.enable_loss = False
+        self.enable_iperf_flows = False
+        self.enable_variational_delay = False
 
         self.active_flow_cnt = 0
         while True:
@@ -34,6 +43,8 @@ class Scenario(object):
             has_start_delay = 0.1 > np.random.random_sample()
             if has_start_delay:
                 start_delay = np.random.exponential()
+
+            # TODO set timeout
 
             # determine the initinal link delay
             initial_link_delay = np.random.randint(10, 200)
@@ -87,11 +98,14 @@ class Scenario(object):
     def get_queue_size(self):
         return self.queue_size
 
+    def get_step_width(self):
+        return self.scenario_config['step_width']
+
 
 # TODO check
 # min_rtt in ms
 def calculate_cwnd(scenario, worker_idx, min_rtt):
-    bw = scenario.get_bandwidth() * 1e6 / 8 / 1e3 # [bytes/ms]
+    bw = scenario.get_bandwidth() * 1.e6 / 8. / 1.e3 # [bytes/ms]
     cwnd = bw*min_rtt
     cwnd *= cwnd_correction_factor
     cwnd = np.floor(cwnd)

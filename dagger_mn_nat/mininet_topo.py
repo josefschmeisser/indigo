@@ -33,6 +33,7 @@ class TrainingTopo(Topo):
 
         nat1 = self.addNode('nat1', cls=NAT, ip=nat_ip, inNamespace=False)
         self.addLink(nat1, s1)
+        self.addLink(s2, s3)
 
         worker_cnt = len(worker_hosts)
         for i in range(worker_cnt):
@@ -43,7 +44,6 @@ class TrainingTopo(Topo):
         for i in range(worker_cnt):
             receiver_host = self.addHost('h{0}'.format(worker_cnt - i))
             self.addLink(receiver_host, s3)
-        self.addLink(s2, s3)
 
 
 def strip_port(arg):
@@ -132,15 +132,15 @@ class Controller(object):
 
         # limit the outgoing traffic on the worker side
         worker_switch = self.net.get('s2')
-        worker_switch.cmd('tc qdisc change dev eth0 root netem {0}'.format(loss_arg))
+#        worker_switch.cmd('tc qdisc add dev eth0 root netem {0}'.format(loss_arg))
         limit = scenario.get_queue_size()*burst_rate
         worker_switch.cmd('tc qdisc add dev eth0 root tbf rate {0}mbit burst {1} limit {2}'.format(new_bw, burst_rate, limit))
 
         for worker_idx in range(self.worker_cnt):
             worker_host = self.net.get('h{0}'.format(worker_idx))
             current_flow = self.current_indigo_flows[worker_idx]
-            worker_host.cmd('tc qdisc change dev h{0}-eth1 root netem delay {1}ms'.format(worker_idx, current_flow.current_link_delay))
-            worker_host.cmd('tc qdisc add dev h{0}-eth1 root tbf burst {1}'.format(worker_idx, burst_rate))
+            # TODO handle loss here
+            worker_host.cmd('tc qdisc add dev h{0}-eth1 root netem delay {1}ms'.format(worker_idx, current_flow.current_link_delay))
 
     def update_cwnd_values(self, scenario):
         for worker_idx in range(self.worker_cnt):
@@ -157,6 +157,7 @@ class Controller(object):
         self.current_indigo_flows = None
         self.active_iperf_flows = []
 
+        step_width = scenario.get_step_width()
         while not self.stop:
             scenario.step()
 
@@ -171,7 +172,8 @@ class Controller(object):
             self.update_cwnd_values(scenario)
 
 # FIXME division by zero when idle==True
-            time.sleep(0.5) # TODO
+
+            time.sleep(step_width)
 
 #            print('scenario_loop: checking rollout requests...')
             self.resume_cv.acquire()
