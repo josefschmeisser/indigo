@@ -47,7 +47,8 @@ class DaggerLocal(object):
         self.aggregated_actions = []
         self.checkpoint_delta = 10
         self.checkpoint = self.checkpoint_delta
-        self.learn_rate = 0.01
+#        self.learn_rate = 0.01
+        self.learn_rate = 1e-4
         self.regularization_lambda = 1e-4
         self.train_step = 0
 
@@ -73,7 +74,8 @@ class DaggerLocal(object):
             cpu_vars, gpu_vars)])
         """
 
-        self.default_batch_size = 300
+#        self.default_batch_size = 300
+        self.default_batch_size = 500
         self.default_init_state = self.global_network.zero_init_state(
                 self.default_batch_size)
 

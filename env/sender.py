@@ -187,6 +187,7 @@ class Sender(object):
 
         self.seq_num += 1
         self.sent_bytes += len(serialized_data)
+        print('packet size: %d' % len(serialized_data)) # TODO remove
 
     def recv(self):
         serialized_ack, addr = self.sock.recvfrom(1600)

@@ -65,6 +65,9 @@ class IndigoIpcMininetView(object):
     def set_start_delay(self, delay):
         self.ipc_data.contents.start_delay = delay
 
+    def set_timeout(self, timeout):
+        self.ipc_data.contents.timeout = timeout
+
     def handler_thread_fun(self, params):
         while True:
             print('handler_thread loop')
