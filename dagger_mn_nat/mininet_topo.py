@@ -18,7 +18,7 @@ from mininet.util import dumpNodeConnections, pmonitor
 from mininet.log import setLogLevel
 from multiprocessing import Process
 from dagger_mn_nat.scenarios import Scenario, calculate_cwnd
-from helpers.config import config, get_full_worker_list, get_our_worker_list, get_ps_host_list
+from helpers.config import config, get_full_worker_list, get_our_worker_list, get_ps_list
 from helpers.nat_ipc import IndigoIpcMininetView
 
 number_of_episodes = 1000
@@ -42,7 +42,7 @@ class TrainingTopo(Topo):
             self.addLink(worker_host, s1)
             self.addLink(worker_host, s2)
         for i in range(worker_cnt):
-            receiver_host = self.addHost('h{0}'.format(worker_cnt - i))
+            receiver_host = self.addHost('h{0}'.format(2*worker_cnt - i))
             self.addLink(receiver_host, s3)
 
 
@@ -55,11 +55,17 @@ class Controller(object):
     def __init__(self):
         self.config_section = config.get_our_section()
         self.nat_ip = self.config_section['nat_ip']
-        self.our_worker_host_list = get_our_worker_list()
-        self.full_worker_host_list = get_full_worker_list()
-        self.ps_host_list = get_ps_host_list()
-        print(self.our_worker_host_list)
-        self.worker_cnt = len(self.our_worker_host_list)
+
+        self.our_worker_list = get_our_worker_list()
+#        print(self.our_worker_list)
+        self.full_worker_list = get_full_worker_list()
+        self.worker_hosts_arg = ','.join([worker['address'] for worker in self.full_worker_list])
+        print('worker_hosts_arg:', self.worker_hosts_arg)
+        self.ps_list = get_ps_list()
+        self.ps_hosts_arg = ','.join([ps['address'] for ps in self.ps_list])
+        print('ps_hosts_arg:', self.ps_hosts_arg)
+
+        self.worker_cnt = len(self.our_worker_list)
         self.worker_ipc_objects = []
         self.worker_pids = [None] * self.worker_cnt
         self.receiver_pids = [None] * self.worker_cnt
@@ -78,7 +84,7 @@ class Controller(object):
 
     def setup_net(self):
         "Create network and run simple performance test"
-        worker_ip_list = [strip_port(host) for host in self.our_worker_host_list]
+        worker_ip_list = [strip_port(worker['address']) for worker in self.our_worker_list]
         topo = TrainingTopo(worker_ip_list, self.nat_ip)
         self.net = Mininet(topo=topo, link=TCLink)
         # set up routing table
@@ -134,7 +140,7 @@ class Controller(object):
         worker_switch = self.net.get('s2')
 #        worker_switch.cmd('tc qdisc add dev eth0 root netem {0}'.format(loss_arg))
         limit = scenario.get_queue_size()
-        worker_switch.cmd('tc qdisc add dev eth0 root tbf rate {0}mbit burst {1} limit {2}'.format(new_bw, burst_rate, limit))
+        worker_switch.cmd('tc qdisc add dev s2-eth1 root tbf rate {0}mbit burst {1} limit {2}'.format(new_bw, burst_rate, limit))
 
         for worker_idx in range(self.worker_cnt):
             worker_host = self.net.get('h{0}'.format(worker_idx))
@@ -220,7 +226,7 @@ class Controller(object):
         ipc = self.worker_ipc_objects[worker_idx]
         port = ipc.get_port()
         worker_host = self.net.get('h{0}'.format(worker_idx))
-        receiver_host = self.net.get('h{0}'.format(self.worker_cnt - worker_idx))
+        receiver_host = self.net.get('h{0}'.format(2*self.worker_cnt - worker_idx))
         receiver_cmd = '../env/run_receiver.py %s %d &' % (str(worker_host.IP()), port)
         receiver_host.cmd(receiver_cmd)
         receiver_pid = int(receiver_host.cmd('echo $!'))
@@ -233,29 +239,33 @@ class Controller(object):
 
     def start_workers(self):
         print("starting workers...")
-        for i in range(self.worker_cnt):
-            worker_host = self.net.get('h{0}'.format(i))
-            worker_hosts_arg = ','.join(self.full_worker_host_list)
-            ps_hosts_arg = ','.join(self.ps_host_list)
-            task_index = self.config_section['task_index']
+#        for i in range(self.worker_cnt):
+        worker_idx = 0
+        for worker_desc in self.our_worker_list:
+            worker_host = self.net.get('h{0}'.format(worker_idx))
+#            worker_hosts_arg = ','.join(self.full_worker_host_list)
+#            ps_hosts_arg = ','.join(self.ps_host_list)
+#            task_index = self.config_section['task_index']
             worker_cmd = './worker.py ' \
                          '--job-name worker ' \
                          '--worker-id {0} ' \
                          '--task-index {1} ' \
                          '--ps-hosts {2} ' \
-                         '--worker-hosts {3} >indigo-worker-out.txt 2>&1 &' \
-                         .format(i, task_index, ps_hosts_arg, worker_hosts_arg)
+                         '--worker-hosts {3} >worker{0}-out.txt 2>&1 &' \
+                         .format(worker_idx, worker_desc['task_index'], self.ps_hosts_arg, self.worker_hosts_arg)
             print("worker_cmd: {0}".format(worker_cmd))
             # start worker
             worker_host.cmd(worker_cmd)
             worker_pid = int(worker_host.cmd('echo $!'))
-            self.worker_pids[i] = worker_pid
+            self.worker_pids[worker_idx] = worker_pid
             print("worker started")
+
+            worker_idx += 1
 
     def stop_receiver(self, worker_idx):
         if self.receiver_pids[worker_idx] is None:
             return
-        receiver_host = self.net.get('h{0}'.format(self.worker_cnt - worker_idx))
+        receiver_host = self.net.get('h{0}'.format(2*self.worker_cnt - worker_idx))
         receiver_host.cmd('kill', self.receiver_pids[worker_idx])
         self.receiver_pids[worker_idx] = None
 

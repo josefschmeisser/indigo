@@ -1,6 +1,6 @@
 import numpy as np
 import collections
-from helpers.config import config, get_full_worker_list, get_our_worker_list, get_ps_host_list
+from helpers.config import config
 
 packet_size = 1600 # (in bytes) TODO check
 cwnd_correction_factor = 0.95

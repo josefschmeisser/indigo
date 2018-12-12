@@ -55,13 +55,13 @@ def get_our_worker_list():
     section = config.get_our_section()
     if section['role_type'] != 'mn':
         raise RuntimeError('expected \'role_type: \'mn\'\'')
-    worker_hosts = []
+    workers = []
     for worker_desc in section['workers']:
-        worker_hosts.append(worker_desc['address'])
-    return worker_hosts
+        workers.append(worker_desc)
+    return workers
 
 def get_full_worker_list():
-    worker_hosts = []
+    workers = []
     document = config.get_all()
     for role_name in document:
         role_desc = document[role_name]
@@ -69,12 +69,12 @@ def get_full_worker_list():
         if role_desc['role_type'] != 'mn':
             continue
         for worker_desc in role_desc['workers']:
-            worker_hosts.append(worker_desc['address'])
-    return worker_hosts
+            workers.append(worker_desc)
+    return workers
 
 # e.g. ['172.17.0.2:5000']
-def get_ps_host_list():
-    ps_hosts = []
+def get_ps_list():
+    ps_list = []
     document = config.get_all()
     for role_name in document:
         role_desc = document[role_name]
@@ -82,5 +82,5 @@ def get_ps_host_list():
         print(role_desc['role_type'])
         if role_desc['role_type'] != 'ps':
             continue
-        ps_hosts.append(role_desc['address'])
-    return ps_hosts
+        ps_list.append(role_desc)
+    return ps_list
