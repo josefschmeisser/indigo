@@ -162,9 +162,10 @@ class Controller(object):
     def scenario_loop(self, scenario):
         self.current_indigo_flows = None
         self.active_iperf_flows = []
-
+        print('scenario_loop()')
         step_width = scenario.get_step_width()
         while not self.stop:
+            print 'scenario_loop() new step'
             scenario.step()
 
             new_flows = scenario.get_active_iperf_flows()
@@ -181,10 +182,10 @@ class Controller(object):
 
             time.sleep(step_width)
 
-#            print('scenario_loop: checking rollout requests...')
+            print('scenario_loop: checking rollout requests...')
             self.resume_cv.acquire()
             notify = self.rollout_requests == self.worker_cnt
-#            print('scenario_loop: checking rollout requests - notify: %d' % notify)
+            print('scenario_loop: checking rollout requests - notify: %d' % notify)
             if notify:
                 print('notifying workers...')
                 self.rollout_requests = 0
@@ -196,7 +197,7 @@ class Controller(object):
     def run(self):
         self.net.start()
 
-        CLI(self.net)
+#        CLI(self.net)
 
         self.start_workers()
 
@@ -206,9 +207,9 @@ class Controller(object):
             scenario = Scenario(self.worker_cnt)
             # set up worker parameters
             active_workers = scenario.get_active_worker_vector()
-            indigo_flows = scenario.get_indigo_flows()
+            self.current_indigo_flows = scenario.get_indigo_flows()
             for i in range(self.worker_cnt):
-                indigo_flow = indigo_flows[i]
+                indigo_flow = self.current_indigo_flows[i]
                 ipc = self.worker_ipc_objects[i]
                 ipc.set_idle_state(not active_workers[i])
                 ipc.set_start_delay(indigo_flow.start_delay)

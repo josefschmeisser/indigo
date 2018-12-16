@@ -178,6 +178,9 @@ class DaggerLeader(object):
 
         pi = self.global_network
 
+        print 'type: {} values {}'.format(type(self.init_state), self.init_state)
+        sys.stdout.lush()
+
         start_ts = curr_ts_ms()
         ret = self.sess.run(ops_to_run, feed_dict={
             pi.input: batch_states,
@@ -411,6 +414,7 @@ class DaggerWorker(object):
 
     def rollout(self):
         """ Start an episode/flow with an empty dataset/environment. """
+        print 'in DaggerWorker.rollout()'
         self.state_buf = []
         self.action_buf = []
         self.prev_action = self.action_cnt - 1
@@ -440,6 +444,7 @@ class DaggerWorker(object):
             self.curr_ep += 1
 
     def run_for_one_episode(self, debug=False):
+        print 'debug mode: {}'.format(debug)
         if debug:
             sys.stderr.write('[WORKER %d Ep %d] Starting...\n' %
                                 (self.task_idx, self.curr_ep))

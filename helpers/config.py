@@ -50,7 +50,7 @@ def parse_config_args():
     prog_args = parser.parse_args()
     config.load(prog_args.config, prog_args.role)
 
-# e.g. ['10.0.0.1:5001']
+# e.g. [{'task_index': 0, 'address': '10.0.0.1:5001'}]
 def get_our_worker_list():
     section = config.get_our_section()
     if section['role_type'] != 'mn':
@@ -65,21 +65,21 @@ def get_full_worker_list():
     document = config.get_all()
     for role_name in document:
         role_desc = document[role_name]
-        print('dump:', yaml.dump(role_desc))
+#        print('dump:', yaml.dump(role_desc))
         if role_desc['role_type'] != 'mn':
             continue
         for worker_desc in role_desc['workers']:
             workers.append(worker_desc)
     return workers
 
-# e.g. ['172.17.0.2:5000']
+# e.g. [{'task_index': 0, 'address': '172.17.0.2:5000'}]
 def get_ps_list():
     ps_list = []
     document = config.get_all()
     for role_name in document:
         role_desc = document[role_name]
-        print(yaml.dump(role_desc))
-        print(role_desc['role_type'])
+#        print(yaml.dump(role_desc))
+#        print(role_desc['role_type'])
         if role_desc['role_type'] != 'ps':
             continue
         ps_list.append(role_desc)

@@ -58,10 +58,10 @@ class IndigoIpcMininetView(object):
 
     def get_port(self):
         return self.ipc_data.contents.port
-    """
-    def set_task_id(self, task_id):
-        self.ipc_data.contents.task_id = task_id
-    """
+    
+    def get_min_rtt(self):
+        return self.ipc_data.contents.min_rtt
+
     def set_start_delay(self, delay):
         self.ipc_data.contents.start_delay = delay
 

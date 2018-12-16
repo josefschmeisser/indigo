@@ -28,29 +28,29 @@ class Scenario(object):
         while True:
             self.worker_vec = np.random.choice(a=[False, True], size=(worker_cnt))
             self.active_flow_cnt = np.count_nonzero(self.worker_vec)
-            if self.active_flow_cnt == 0:
-                continue
+            if self.active_flow_cnt > 0:
+                break
 
         self.indigo_flows = []
         for worker_idx in range(worker_cnt):
             if not self.worker_vec[worker_idx]:
-                self.indigo_flows.append(IndigoFlow(worker_idx, False, 0, 0, 0, 0, 0))
+                self.indigo_flows.append(IndigoFlow(worker_idx, False, 0, 0, 0, 0))
                 continue
 
             # determine start delay
             start_delay = 0
             has_start_delay = 0.1 > np.random.random_sample()
             if has_start_delay:
-                start_delay = np.random.exponential()
+                start_delay = int(np.random.exponential())
 
             # determine the initinal link delay
             initial_link_delay = np.random.randint(10, 200)
 
             self.indigo_flows.append(IndigoFlow(worker_idx, True, start_delay, self.worker_timeout, initial_link_delay, initial_link_delay))
 
+        self.iperf_flows = []
         # initialize iperf flows (if enabled)
         if self.enable_iperf_flows:
-            self.iperf_flows = []
             iperf_flow_vec = np.random.choice(a=[False, True], size=(worker_cnt), p=(0.9, 0.1))
             iperf_flow_vec = np.logical_and(np.logical_not(self.worker_vec), iperf_flow_vec)
             iperf_flow_cnt = np.count_nonzero(iperf_flow_vec)
@@ -75,12 +75,14 @@ class Scenario(object):
         # update workers
         for worker_idx in range(self.worker_cnt):
             flow = self.indigo_flows[worker_idx]
+            if not flow.active:
+                continue
             new_link_delay = flow.current_link_delay
             adjust_delay = self.enable_variational_delay and (self.delay_change_probability > np.random.random_sample())
             if adjust_delay:
                 new_link_delay = np.random.normal(loc=flow.initial_link_delay, scale=0.1*flow.initial_link_delay)
-            # create the new tuple (https://stackoverflow.com/a/40980990)
-            self.indigo_flows[worker_idx] = IndigoFlow(current_link_delay=new_link_delay, **flow._asdict())
+            # create the new tuple
+            self.indigo_flows[worker_idx] = IndigoFlow(worker_idx, True, flow.start_delay, flow.timeout, flow.initial_link_delay, new_link_delay)
 
         # TODO update iperf flows
         if self.enable_iperf_flows:
@@ -114,7 +116,8 @@ class Scenario(object):
 # min_rtt in ms
 def calculate_cwnd(scenario, worker_idx, min_rtt):
     bw = scenario.get_bandwidth() * 1.e6 / 8. / 1.e3 # [bytes/ms]
+    # FIXME bw/= active_flow_cnt (indigo and iperf)
     cwnd = bw*min_rtt
     cwnd *= cwnd_correction_factor
-    pkt_cwnd = np.floor(cwnd/packet_size)
+    pkt_cwnd = int(cwnd/packet_size)
     return pkt_cwnd
