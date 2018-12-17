@@ -86,6 +86,7 @@ class Scenario(object):
 
         # TODO update iperf flows
         if self.enable_iperf_flows:
+            # TODO update self.active_flow_cnt
             pass
 
     def get_active_iperf_flows(self):
@@ -111,13 +112,16 @@ class Scenario(object):
     def get_step_width(self):
         return self.scenario_config['step_width']
 
+    def get_active_flow_count(self):
+        return self.active_flow_cnt
+
 
 # TODO check
 # min_rtt in ms
 def calculate_cwnd(scenario, worker_idx, min_rtt):
     bw = scenario.get_bandwidth() * 1.e6 / 8. / 1.e3 # [bytes/ms]
-    # FIXME bw/= active_flow_cnt (indigo and iperf)
-    cwnd = bw*min_rtt
+    per_flow_bw = bw/scenario.get_active_flow_count()
+    cwnd = per_flow_bw*min_rtt
     cwnd *= cwnd_correction_factor
     pkt_cwnd = int(cwnd/packet_size)
     return pkt_cwnd
