@@ -44,7 +44,7 @@ class Scenario(object):
                 start_delay = int(np.random.exponential())
 
             # determine the initinal link delay
-            initial_link_delay = np.random.randint(10, 200)
+            initial_link_delay = np.random.randint(10, 200) # TODO config option
 
             self.indigo_flows.append(IndigoFlow(worker_idx, True, start_delay, self.worker_timeout, initial_link_delay, initial_link_delay))
 

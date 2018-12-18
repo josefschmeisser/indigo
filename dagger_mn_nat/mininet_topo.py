@@ -140,6 +140,7 @@ class Controller(object):
         worker_switch = self.net.get('s2')
 #        worker_switch.cmd('tc qdisc add dev eth0 root netem {0}'.format(loss_arg))
         limit = scenario.get_queue_size()
+        # TODO change after first run
         worker_switch.cmd('tc qdisc add dev s2-eth1 root tbf rate {0}mbit burst {1} limit {2}'.format(new_bw, burst_rate, limit))
 
         for worker_idx in range(self.worker_cnt):
