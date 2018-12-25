@@ -26,27 +26,25 @@ class DaggerLSTM(object):
         self.add_one = self.cnt.assign_add(1.0)
 
         # self.input: [batch_size, max_time, state_dim]
-        self.input = tf.placeholder(tf.float32, [None, None, state_dim])
+        self.input = tf.placeholder(tf.float32, [None, None, state_dim], name='input')
 
         self.num_layers = 1
         self.lstm_dim = 32
-        stacked_lstm = rnn.MultiRNNCell([rnn.BasicLSTMCell(self.lstm_dim)
+        stacked_lstm = rnn.MultiRNNCell([rnn.BasicLSTMCell(self.lstm_dim, state_is_tuple=True)
             for _ in xrange(self.num_layers)])
 
-        self.state_in = []
+        # self.state_in [num_layers, <lstm state>, batch_size, lstm_dim]
+        self.state_in = tf.placeholder(tf.float32, [self.num_layers, 2, None, self.lstm_dim])
         state_tuple_in = []
-        for _ in xrange(self.num_layers):
-            c_in = tf.placeholder(tf.float32, [None, self.lstm_dim])
-            h_in = tf.placeholder(tf.float32, [None, self.lstm_dim])
-            self.state_in.append((c_in, h_in))
-            state_tuple_in.append(rnn.LSTMStateTuple(c_in, h_in))
 
-        self.state_in = tuple(self.state_in)
+        for layer_state in tf.unstack(self.state_in, axis=0):
+            # fetch c_in and h_in
+            state_tuple_in.append(rnn.LSTMStateTuple(layer_state[0], layer_state[1]))
         state_tuple_in = tuple(state_tuple_in)
 
         # self.output: [batch_size, max_time, lstm_dim]
         output, state_tuple_out = tf.nn.dynamic_rnn(
-            stacked_lstm, self.input, initial_state=state_tuple_in)
+            stacked_lstm, inputs=self.input, initial_state=state_tuple_in)
 
         self.state_out = self.convert_state_out(state_tuple_out)
 
@@ -65,10 +63,4 @@ class DaggerLSTM(object):
         return tuple(state_out)
 
     def zero_init_state(self, batch_size):
-        init_state = []
-        for _ in xrange(self.num_layers):
-            c_init = np.zeros([batch_size, self.lstm_dim], np.float32)
-            h_init = np.zeros([batch_size, self.lstm_dim], np.float32)
-            init_state.append((c_init, h_init))
-
-        return init_state
+        return np.zeros((self.num_layers, 2, batch_size, self.lstm_dim))
