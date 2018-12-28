@@ -151,14 +151,6 @@ class Controller(object):
         limit = scenario.get_queue_size() # in bytes
         worker_switch.cmd('tc qdisc change dev s2-eth1 root tbf rate {0}mbit burst {1} limit {2}'.format(new_bw, burst_rate, limit))
 
-        """
-        for worker_idx in range(self.worker_cnt):
-            worker_host = self.net.get('h{0}'.format(worker_idx))
-            current_flow = self.current_indigo_flows[worker_idx]
-            # TODO handle loss here
-            worker_host.cmd('tc qdisc change dev h{0}-eth1 root netem delay {1}ms'.format(worker_idx, current_flow.current_link_delay))
-        """
-
     def count_active_indigo_flows(self):
         cnt = 0
         for worker_idx in range(self.worker_cnt):
@@ -196,7 +188,6 @@ class Controller(object):
             ipc.set_idle_state(not active_workers[i])
             ipc.set_start_delay(indigo_flow.start_delay)
 
-#        print('execute_scenario()')
         step_width = scenario.get_step_width()
         while not self.stop:
             print 'execute_scenario() new step'
@@ -264,13 +255,9 @@ class Controller(object):
 
     def start_workers(self):
         print("starting workers...")
-#        for i in range(self.worker_cnt):
         worker_idx = 0
         for worker_desc in self.our_worker_list:
             worker_host = self.net.get('h{0}'.format(worker_idx))
-#            worker_hosts_arg = ','.join(self.full_worker_host_list)
-#            ps_hosts_arg = ','.join(self.ps_host_list)
-#            task_index = self.config_section['task_index']
             worker_cmd = './worker.py ' \
                          '--job-name worker ' \
                          '--worker-id {0} ' \
