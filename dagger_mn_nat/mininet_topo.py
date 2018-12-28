@@ -112,19 +112,22 @@ class Controller(object):
             self.active_iperf_flows.append((flow, pid))
 
     def update_indigo_flows(self, scenario_indigo_flows):
+        update_all = False
         if self.current_indigo_flows is None:
             self.current_indigo_flows = scenario_indigo_flows
-            return
+            update_all = True
 
         # update flows
         for worker_idx in range(self.worker_cnt):
             current_flow = self.current_indigo_flows[worker_idx]
             scenario_flow = scenario_indigo_flows[worker_idx]
-            if current_flow == scenario_flow:
-                continue
             # update current_link_delay (the only mutable attribute at the present time)
-            if current_flow.current_link_delay != scenario_flow.current_link_delay:
-                pass # TODO
+            if update_all or (current_flow.current_link_delay != scenario_flow.current_link_delay):
+                worker_host = self.net.get('h{0}'.format(worker_idx))
+                tc_cmd = 'tc qdisc change dev h{0}-eth1 root netem delay {1}ms'
+                tc_cmd = tc_cmd.format(worker_idx, scenario_flow.current_link_delay)
+                worker_host.cmd(tc_cmd)
+            # remember the current state
             self.current_indigo_flows[worker_idx] = scenario_flow
 
     def initialize_network_parameters(self):
@@ -134,7 +137,7 @@ class Controller(object):
             worker_host = self.net.get('h{0}'.format(worker_idx))
             worker_host.cmd('tc qdisc add dev h{0}-eth1 root netem delay 5ms'.format(worker_idx))
 
-    def adjust_network_parameters(self, scenario):
+    def adjust_global_network_parameters(self, scenario):
         new_bw = scenario.get_bandwidth() # [Mbps]
 
         new_loss_rate = scenario.get_loss_rate()
@@ -148,11 +151,13 @@ class Controller(object):
         limit = scenario.get_queue_size() # in bytes
         worker_switch.cmd('tc qdisc change dev s2-eth1 root tbf rate {0}mbit burst {1} limit {2}'.format(new_bw, burst_rate, limit))
 
+        """
         for worker_idx in range(self.worker_cnt):
             worker_host = self.net.get('h{0}'.format(worker_idx))
             current_flow = self.current_indigo_flows[worker_idx]
             # TODO handle loss here
             worker_host.cmd('tc qdisc change dev h{0}-eth1 root netem delay {1}ms'.format(worker_idx, current_flow.current_link_delay))
+        """
 
     def count_active_indigo_flows(self):
         cnt = 0
@@ -164,45 +169,57 @@ class Controller(object):
     def update_cwnd_values(self, scenario):
         active_indigo_flow_cnt = self.count_active_indigo_flows()
         for worker_idx in range(self.worker_cnt):
+            current_flow = self.current_indigo_flows[worker_idx]
+            if not current_flow.active:
+                continue
             ipc = self.worker_ipc_objects[worker_idx]
             min_rtt = ipc.get_min_rtt()
-            # min_rtt == 0 => min_rtt = initial_link_delay
+            # min_rtt == 0 => min_rtt = current_link_delay
             if min_rtt == 0:
-                current_flow = self.current_indigo_flows[worker_idx]
-                min_rtt = current_flow.initial_link_delay
+                min_rtt = current_flow.current_link_delay
             flow_cnt = active_indigo_flow_cnt + len(scenario.get_active_iperf_flows())
             cwnd = calculate_cwnd(scenario, min_rtt, flow_cnt)
-            print('worker {} new cwnd {}'.format(worker_idx, cwnd))
+            print('worker {} new cwnd: {} min_rtt: {} theoretical rtt: {}'.format(worker_idx, cwnd, ipc.get_min_rtt(), current_flow.current_link_delay))
             ipc.set_cwnd(cwnd)
 
-    def scenario_loop(self, scenario):
-        self.current_indigo_flows = None
+    def execute_scenario(self, scenario):
+        # reset
         self.active_iperf_flows = []
-        print('scenario_loop()')
+        self.current_indigo_flows = None
+
+        # set up worker parameters
+        active_workers = scenario.get_worker_vector()
+        indigo_flows = scenario.get_indigo_flows()
+        for i in range(self.worker_cnt):
+            indigo_flow = indigo_flows[i]
+            ipc = self.worker_ipc_objects[i]
+            ipc.set_idle_state(not active_workers[i])
+            ipc.set_start_delay(indigo_flow.start_delay)
+
+#        print('execute_scenario()')
         step_width = scenario.get_step_width()
         while not self.stop:
-            print 'scenario_loop() new step'
+            print 'execute_scenario() new step'
             active_indigo_flow_cnt = self.count_active_indigo_flows()
-            scenario.step(active_indigo_flow_cnt)
+            state_update = scenario.step(active_indigo_flow_cnt)
 
-            new_flows = scenario.get_active_iperf_flows()
-            self.udpate_iperf_flows(new_flows)
-
-            scenario_indigo_flows = scenario.get_indigo_flows()
-            self.update_indigo_flows(scenario_indigo_flows)
-
-            self.adjust_network_parameters(scenario)
-
+            # update parameters
+            if state_update.new_bw:
+                self.adjust_global_network_parameters(scenario)
+            if state_update.iperf_flows_udpate:
+                new_flows = scenario.get_active_iperf_flows()
+                self.udpate_iperf_flows(new_flows)
+            if state_update.indigo_flows_update:
+                scenario_indigo_flows = scenario.get_indigo_flows()
+                self.update_indigo_flows(scenario_indigo_flows)
             self.update_cwnd_values(scenario)
-
-# FIXME division by zero when idle==True
 
             time.sleep(step_width)
 
-            print('scenario_loop: checking rollout requests...')
+#            print('execute_scenario: checking rollout requests...')
             self.resume_cv.acquire()
             notify = self.rollout_requests == self.worker_cnt
-            print('scenario_loop: checking rollout requests - notify: %d' % notify)
+#            print('execute_scenario: checking rollout requests - notify: %d' % notify)
             if notify:
                 print('notifying workers...')
                 self.rollout_requests = 0
@@ -223,17 +240,7 @@ class Controller(object):
             if self.stop:
                 break
             scenario = Scenario(self.worker_cnt)
-            # set up worker parameters
-            active_workers = scenario.get_worker_vector()
-            self.current_indigo_flows = scenario.get_indigo_flows()
-            for i in range(self.worker_cnt):
-                indigo_flow = self.current_indigo_flows[i]
-                ipc = self.worker_ipc_objects[i]
-                ipc.set_idle_state(not active_workers[i])
-                ipc.set_start_delay(indigo_flow.start_delay)
-            self.update_cwnd_values(scenario)
-
-            self.scenario_loop(scenario)
+            self.execute_scenario(scenario)
 
 #        CLI(self.net)
 

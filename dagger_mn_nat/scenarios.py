@@ -8,6 +8,7 @@ packet_size = 1600 # (in bytes) TODO check
 cwnd_correction_factor = 0.95
 iPerfFlow = collections.namedtuple('iPerfFlow', 'host_idx start_ts bw proto linux_congestion')
 IndigoFlow = collections.namedtuple('IndigoFlow', 'host_idx active start_delay initial_link_delay current_link_delay')
+StateUpdate = collections.namedtuple('StateUpdate', 'new_bw, indigo_flows_update, iperf_flows_udpate')
 
 class Scenario(object):
     def __init__(self, worker_cnt):
@@ -52,7 +53,7 @@ class Scenario(object):
                 start_delay = int(np.random.exponential())
 
             # determine the initinal link delay
-            initial_link_delay = np.random.randint(10, 200)
+            initial_link_delay = np.random.randint(10, 100)
 
             self.indigo_flows.append(IndigoFlow(worker_idx, True, start_delay, initial_link_delay, initial_link_delay))
 
@@ -74,11 +75,19 @@ class Scenario(object):
                 self.iperf_flows.append(iPerfFlow(worker_idx, 0, per_flow_bw))
 
     def step(self, running_indigo_flow_cnt):
+        if self.ts == 0:
+            self.ts += 1
+            return StateUpdate(True, True, True)
         self.ts += 1
+
+        new_bw = False
+        indigo_flows_update = False
+        iperf_flows_udpate = False
 
         # update bandwidth
         adjust_bw = self.bandwidth_change_probability > np.random.random_sample()
         if adjust_bw:
+            new_bw = True
             self.current_bw = np.random.choice(self.available_bandwidths, size=1)[0]
             print('new bw: {}'.format(self.current_bw))
 
@@ -90,13 +99,18 @@ class Scenario(object):
             new_link_delay = flow.current_link_delay
             adjust_delay = self.enable_variational_delay and (self.delay_change_probability > np.random.random_sample())
             if adjust_delay:
+                indigo_flows_update = True
                 new_link_delay = np.random.normal(loc=flow.initial_link_delay, scale=0.1*flow.initial_link_delay)
+                new_link_delay = max(flow.initial_link_delay, new_link_delay)
+                print('worker {} new delay: {}'.format(worker_idx, new_link_delay))
             # create the new tuple
             self.indigo_flows[worker_idx] = IndigoFlow(worker_idx, True, flow.start_delay, flow.initial_link_delay, new_link_delay)
 
         # TODO update iperf flows
         if self.enable_iperf_flows:
             pass
+
+        return StateUpdate(new_bw, indigo_flows_update, iperf_flows_udpate)
 
     def get_active_iperf_flows(self):
         return self.iperf_flows
