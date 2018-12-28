@@ -27,9 +27,11 @@ class MininetNatEnvironment(object):
         self.ipc = IndigoIpcWorkerView(worker_id)
 
     def __sample_action_hook(self, state):
-        if self.sample_action:
-            self.sample_action(state)
-        self.ipc.set_min_rtt(self.sender.min_rtt)
+        assert(self.sample_action)
+        action = self.sample_action(state)
+        print('min rtt: {}'.format(self.sender.min_rtt))
+        self.ipc.set_min_rtt(int(self.sender.min_rtt))
+        return action
 
     def set_sample_action(self, sample_action):
         """Set the sender's policy. Must be called before calling reset()."""
@@ -48,7 +50,7 @@ class MininetNatEnvironment(object):
         # start sender:
         sys.stderr.write('Starting sender...\n')
         self.sender = Sender(self.port, train=True, debug=True)
-        self.sender.set_sample_action(self.sample_action)
+        self.sender.set_sample_action(self.__sample_action_hook)
 
     def __run_sender(self):
         # sender completes the handshake sent from receiver
@@ -57,7 +59,9 @@ class MininetNatEnvironment(object):
         start_delay = self.ipc.get_start_delay()
         if start_delay > 0:
             time.sleep(1e-3*start_delay)
-        self.sender.run(training_timeout_ms=self.ipc.get_timeout())
+        self.ipc.set_flow_is_active(True)
+        self.sender.run()
+        self.ipc.set_flow_is_active(False)
 
     def rollout(self):
         self.cleanup()

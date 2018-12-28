@@ -22,24 +22,18 @@ def format_actions(action_list):
     return {idx: [action[0], float(action[1:])]
                   for idx, action in enumerate(action_list)}
 
+default_cwnd = 10.0
 
 class Sender(object):
     # RL exposed class/static variables
-#    max_steps = 1000
-    training_timeout_ms = 1000 # ms
-    start_ts_ms = 0
+    max_steps = 1000
     state_dim = 4
-    action_mapping = format_actions(["*0.5", "*0.9", "+0.0", "*1.1", "*2.0"]) # TODO new actions
+    action_mapping = format_actions(["*0.5", "*0.9", "+0.0", "*1.1", "*2.0"])
     action_cnt = len(action_mapping)
 
     def __init__(self, port=0, train=False, debug=False):
         self.train = train
         self.debug = debug
-
-        ### TODO
-        self.max_patience = 10
-        self.current_patience = self.max_patience
-        ###
 
         # UDP socket and poller
         self.peer_addr = None
@@ -61,7 +55,7 @@ class Sender(object):
         # congestion control related
         self.seq_num = 0
         self.next_ack = 0
-        self.cwnd = 10.0
+        self.cwnd = default_cwnd
         self.step_len_ms = 10
 
         # state variables for RLCC
@@ -149,26 +143,12 @@ class Sender(object):
             self.send_rate_ewma = (
                 0.875 * self.send_rate_ewma + 0.125 * send_rate)
 
-    def take_action_old(self, action_idx):
-        op, val = self.action_mapping[action_idx]
-
-        self.cwnd = apply_op(op, self.cwnd, val)
-        self.cwnd = max(2.0, self.cwnd)
-
     def take_action(self, action_idx):
         old_cwnd = self.cwnd
         op, val = self.action_mapping[action_idx]
 
         self.cwnd = apply_op(op, self.cwnd, val)
         self.cwnd = max(2.0, self.cwnd)
-
-        ### TODO patience
-        """
-        if old_cwnd == self.cwnd:
-            self.current_patience -= 1
-            if self.current_patience < 1:
-                self.cwnd = int(self.cwnd*1.1)
-        """
 
     def window_is_open(self):
         return self.seq_num - self.next_ack < self.cwnd
@@ -187,7 +167,7 @@ class Sender(object):
 
         self.seq_num += 1
         self.sent_bytes += len(serialized_data)
-        print('packet size: %d' % len(serialized_data)) # TODO remove
+#        print('packet size: %d' % len(serialized_data)) # max 1436 bytes
 
     def recv(self):
         serialized_ack, addr = self.sock.recvfrom(1600)
@@ -226,7 +206,7 @@ class Sender(object):
             self.send_rate_ewma = None
 
             self.step_start_ms = curr_ts_ms()
-            """
+
             if self.train:
                 self.step_cnt += 1
                 if self.step_cnt >= Sender.max_steps:
@@ -234,21 +214,9 @@ class Sender(object):
                     self.running = False
 
                     self.compute_performance()
-            """
-            # new timeout system
-            if self.train:
-                runtime = self.step_start_ms - self.start_ts_ms
-                if runtime >= self.training_timeout_ms:
-                    self.step_cnt = 0
-                    self.running = False
 
-                    self.compute_performance()
-
-    def run(self, training_timeout_ms=0):
+    def run(self):
         POOLING_TIMEOUT = 1000  # ms
-
-        self.training_timeout_ms = training_timeout_ms
-        self.start_ts_ms = curr_ts_ms()
 
         self.poller.modify(self.sock, ALL_FLAGS)
         curr_flags = ALL_FLAGS

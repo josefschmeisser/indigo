@@ -119,6 +119,7 @@ class DaggerLeader(object):
         self.total_loss = cross_entropy_loss + reg_loss
 
         optimizer = tf.train.AdamOptimizer(self.learn_rate)
+        # TODO gradient clipping to avoid nan loss?
         self.train_op = optimizer.minimize(self.total_loss)
 
         tf.summary.scalar('reduced_ce_loss', cross_entropy_loss)
@@ -178,19 +179,17 @@ class DaggerLeader(object):
 
         pi = self.global_network
 
-
+        """
         batch_size = len(batch_states)
         batch_actions = [batch_actions[-1]]*batch_size
         batch_states = [batch_states[-1]]*batch_size
         """
-        print 'batch_states type: {} len: {} values: {}'.format(type(batch_states), len(batch_states), batch_states)
-        print 'batch_actions type: {} len: {} values: {}'.format(type(batch_actions), len(batch_actions), batch_actions)
-        print 'self.init_state type: {} len: {} values: {}'.format(type(self.init_state), len(self.init_state), self.init_state)
         """
         print 'batch_states shape: {}'.format(np.asarray(batch_states).shape)
         print 'batch_actions shape: {}'.format(np.asarray(batch_actions).shape)
         print 'self.init_state shape: {}'.format(np.asarray(self.init_state).shape)
         sys.stdout.flush()
+        """
 
         start_ts = curr_ts_ms()
         ret = self.sess.run(ops_to_run, feed_dict={
@@ -218,16 +217,10 @@ class DaggerLeader(object):
         batch_size = min(len(self.aggregated_states), self.default_batch_size)
         num_batches = len(self.aggregated_states) / batch_size
 
-        print("DEBUG: aggregated_states type: %s len: %d" % (type(self.aggregated_states), len(self.aggregated_states)))
-        print("DEBUG: batch_size != self.default_batch_size: %s" % str(batch_size != self.default_batch_size))
-        print("DEBUG: batch_size: %d" % batch_size)
         if batch_size != self.default_batch_size:
             self.init_state = self.global_network.zero_init_state(batch_size)
         else:
             self.init_state = self.default_init_state
-#        self.init_state = self.global_network.zero_init_state(1)*batch_size
-#        print str(self.init_state)
-#        self.init_state = self.global_network.zero_init_state(1)
 
         while True:
             curr_iter += 1
@@ -243,8 +236,6 @@ class DaggerLeader(object):
 
                 batch_states = self.aggregated_states[start:end]
                 batch_actions = self.aggregated_actions[start:end]
-#                batch_states = self.aggregated_states[-1:]
-#                batch_actions = self.aggregated_actions[-1:]
 
                 loss = self.run_one_train_step(batch_states, batch_actions)
 

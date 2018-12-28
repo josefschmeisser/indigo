@@ -8,19 +8,23 @@ import time
 
 from ctypes import *
 from mmap import PROT_WRITE, PROT_READ, MAP_SHARED
-
+from env.sender import default_cwnd
 
 class IpcData(Structure):
     _fields_ = [
-        ("port", c_uint16),        # set by the worker
-        ("min_rtt", c_uint32),     # set by the worker
-        ("cwnd", c_uint32),        # set by the mn controller
-        ("idle", c_bool),          # set by the mn controller
+        # set by the worker:
+        ("port", c_uint16),
+        ("min_rtt", c_uint32),
+        ("flow_is_active", c_bool),
+        # set by the mn controller
+        ("cwnd", c_uint32),
+        ("idle", c_bool),
         ("start_delay", c_uint32), # in ms
-        ("timeout", c_uint32),     # in ms
-        ("task_id", c_uint32)]
+        ("task_id", c_uint32)]     # tensorflow task_id
 
-shm_fmt_str = '=HII?III'
+shm_fmt_str = '=HI?I?II'
+
+uint32_max = 2**32 - 1
 
 class IndigoIpcMininetView(object):
     def __init__(self, worker_id):
@@ -43,7 +47,10 @@ class IndigoIpcMininetView(object):
         self.drain_queues()
 
         # set some initial values
-        self.ipc_data.contents.cwnd = 5
+        self.ipc_data.contents.cwnd = int(default_cwnd)
+        self.ipc_data.contents.idle = False
+        self.ipc_data.contents.start_delay = 0
+        self.ipc_data.contents.task_id = uint32_max
 
         self.handler_thread = None
 
@@ -65,8 +72,8 @@ class IndigoIpcMininetView(object):
     def set_start_delay(self, delay):
         self.ipc_data.contents.start_delay = delay
 
-    def set_timeout(self, timeout):
-        self.ipc_data.contents.timeout = timeout
+    def get_flow_is_active(self):
+        return self.ipc_data.contents.flow_is_active
 
     def handler_thread_fun(self, params):
         while True:
@@ -116,7 +123,9 @@ class IndigoIpcWorkerView(object):
         self.ipc_data = cast(self.ptr, POINTER(IpcData))
 
         # set some initial values
-        self.ipc_data.contents.min_rtt = 0
+        self.ipc_data.contents.port = 0
+        self.ipc_data.contents.min_rtt = uint32_max
+        self.ipc_data.contents.flow_is_active = False
 
         # message queues
         self.mn_msg_q = posix_ipc.MessageQueue('/indigo_mn_msg_q_worker_%d' % worker_id, posix_ipc.O_CREAT)
@@ -137,8 +146,8 @@ class IndigoIpcWorkerView(object):
     def get_start_delay(self):
         return self.ipc_data.contents.start_delay
 
-    def get_timeout(self):
-        return self.ipc_data.contents.timeout
+    def set_flow_is_active(self, is_active):
+        self.ipc_data.contents.flow_is_active = is_active
 
     def set_min_rtt(self, min_rtt):
         self.ipc_data.contents.min_rtt = min_rtt
