@@ -4,7 +4,8 @@ import sys
 from helpers.config import config
 from env.sender import default_cwnd
 
-packet_size = 1600 # (in bytes) TODO check
+# TODO what about the CRC checksum?
+packet_size = 1478 # (in bytes) (MAC header + IPv4 + UDP header + payload = 14 + 20 + 8 + 1436 = 1478)
 cwnd_correction_factor = 0.95
 iPerfFlow = collections.namedtuple('iPerfFlow', 'host_idx start_ts bw proto linux_congestion')
 IndigoFlow = collections.namedtuple('IndigoFlow', 'host_idx active start_delay initial_link_delay current_link_delay')

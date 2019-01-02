@@ -205,6 +205,11 @@ class Controller(object):
                 self.update_indigo_flows(scenario_indigo_flows)
             self.update_cwnd_values(scenario)
 
+            """
+            if scenario.ts == 10:
+                CLI(self.net)
+            """
+
             time.sleep(step_width)
 
 #            print('execute_scenario: checking rollout requests...')
