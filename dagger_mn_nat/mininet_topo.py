@@ -209,6 +209,12 @@ class Controller(object):
             if scenario.ts == 10:
                 CLI(self.net)
             """
+            """
+            if scenario.ts > 10 and scenario.current_bw == 15:
+                self.stop_workers()
+                CLI(self.net)
+                exit(0)
+            """
 
             time.sleep(step_width)
 

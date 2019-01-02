@@ -118,9 +118,14 @@ class DaggerLeader(object):
 
         self.total_loss = cross_entropy_loss + reg_loss
 
+        """
         optimizer = tf.train.AdamOptimizer(self.learn_rate)
-        # TODO gradient clipping to avoid nan loss?
         self.train_op = optimizer.minimize(self.total_loss)
+        """
+        optimizer = tf.train.AdamOptimizer(self.learn_rate)
+        gradients, variables = zip(*optimizer.compute_gradients(self.total_loss))
+        gradients, _ = tf.clip_by_global_norm(gradients, 5.0)
+        self.train_op = optimizer.apply_gradients(zip(gradients, variables))
 
         tf.summary.scalar('reduced_ce_loss', cross_entropy_loss)
         tf.summary.scalar('reg_loss', reg_loss)
