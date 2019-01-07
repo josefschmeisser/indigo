@@ -165,12 +165,15 @@ class Controller(object):
             if not current_flow.active:
                 continue
             ipc = self.worker_ipc_objects[worker_idx]
+            """
             min_rtt = ipc.get_min_rtt()
             # min_rtt == 0 => min_rtt = current_link_delay
             if min_rtt == 0:
                 min_rtt = current_flow.current_link_delay
+            """
             flow_cnt = active_indigo_flow_cnt + len(scenario.get_active_iperf_flows())
-            cwnd = calculate_cwnd(scenario, min_rtt, flow_cnt)
+#            cwnd = calculate_cwnd(scenario, min_rtt, flow_cnt)
+            cwnd = calculate_cwnd(scenario, current_flow.current_link_delay, flow_cnt)
             print('worker {} new cwnd: {} min_rtt: {} theoretical rtt: {}'.format(worker_idx, cwnd, ipc.get_min_rtt(), current_flow.current_link_delay))
             ipc.set_cwnd(cwnd)
 
