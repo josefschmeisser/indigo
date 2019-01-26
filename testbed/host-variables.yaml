@@ -1,7 +1,3 @@
 git:
         repo: 'git@gitlab.lrz.de:ml-congestion-control/indigo.git'
-        commit: 'dataset-gen'
-
-port:
-        tx: 0
-        rx: 1
+        commit: 'static_seq_size'

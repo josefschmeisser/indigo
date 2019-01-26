@@ -11,20 +11,24 @@ echo $(pos_get_variable hostname)
 apt-get update
 # python and tensorflow
 apt-get --yes install python-pip python-dev python-virtualenv
-#pip2 install -U pip
+# openvswitch
+apt-get --yes install openvswitch-testcontroller
+ln /usr/bin/ovs-testcontroller /usr/bin/controller
+# python packages
 pip install -U pip
-#pip2 install -U tensorflow
 pip install -U tensorflow
+pip install -U pyyaml
+pip install -U posix_ipc
 # mininet
 apt-get --yes install mininet
 # protobuf
 apt-get --yes install python-protobuf
-# TODO python ipc
 
 # install indigo
 GIT_REPO=$(pos_get_variable git/repo)
-
 INDIGO=indigo
+
+git config --global http.sslVerify false
 
 echo "Cloning $GIT_REPO into $INDIGO"
 git clone --recursive $GIT_REPO $INDIGO

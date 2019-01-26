@@ -28,13 +28,13 @@ echo "reboot experiment host..."
 wait
 
 # copy deploy key (enables read-only access to the git repository)
-{ pos nodes push "$HOST" $HOME/deploy_key/id_rsa --dst /root/.ssh/id_rsa;
-  pos nodes push "$HOST" $HOME/deploy_key/id_rsa.pub --dst /root/.ssh/id_rsa.pub; } &
+{ pos nodes copy "$HOST" $HOME/deploy_key/id_rsa --dest /root/.ssh/id_rsa;
+  pos nodes copy "$HOST" $HOME/deploy_key/id_rsa.pub --dest /root/.ssh/id_rsa.pub; } &
 wait
-pos nodes cmd "$HOST" chmod 600 /root/.ssh/id_rsa
+pos commands launch "$HOST" chmod 600 /root/.ssh/id_rsa
 
 echo "deploy & run experiment scripts..."
-{ pos nodes cmd --infile single-host.sh "$HOST"; echo "$HOST userscript executed"; } &
+{ pos commands launch --infile single-host.sh "$HOST"; echo "$HOST userscript executed"; } &
 wait
 
 # after the experiment is done, make hosts available for other students
