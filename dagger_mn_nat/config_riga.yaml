@@ -1,6 +1,6 @@
 ps1:
   role_type: 'ps'
-  address: '172.16.2.1:5000:5000'
+  address: '172.16.2.1:5000'
   task_index: 0
 
 mn1:
