@@ -15,7 +15,7 @@ apt-get --yes install python-pip python-dev python-virtualenv
 apt-get --yes install openvswitch-testcontroller
 ln /usr/bin/ovs-testcontroller /usr/bin/controller
 # python packages
-pip install -U pip
+#pip install -U pip
 pip install -U tensorflow
 pip install -U pyyaml
 pip install -U posix_ipc
@@ -28,7 +28,8 @@ apt-get --yes install python-protobuf
 GIT_REPO=$(pos_get_variable git/repo)
 INDIGO=indigo
 
-git config --global http.sslVerify false
+# disable strict host checking for gitlab.lrz.de
+echo -e "Host gitlab.lrz.de\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
 
 echo "Cloning $GIT_REPO into $INDIGO"
 git clone --recursive $GIT_REPO $INDIGO
