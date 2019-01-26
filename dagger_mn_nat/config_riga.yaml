@@ -14,7 +14,8 @@ mn1:
     loss_rate: 0.0 # in [0.0, 1.0]
     enable_iperf_flows: False
     enable_variational_delay: False
-    worker_timeout: 10000 # [ms]
+    enable_worker_idling: True
+    enable_worker_start_delay: False
   workers:
     - task_index: 0
       address: '10.0.0.1:5001' # grpc port
