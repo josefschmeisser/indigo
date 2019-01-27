@@ -1,8 +1,11 @@
 import numpy as np
 import collections
 import sys
+import os
+import time
 from helpers.config import config
 from env.sender import default_cwnd
+
 
 # TODO what about the CRC checksum?
 packet_size = 1478 # (in bytes) (MAC header + IPv4 + UDP header + payload = 14 + 20 + 8 + 1436 = 1478)
@@ -10,6 +13,12 @@ cwnd_correction_factor = 0.95
 iPerfFlow = collections.namedtuple('iPerfFlow', 'host_idx start_ts bw proto linux_congestion')
 IndigoFlow = collections.namedtuple('IndigoFlow', 'host_idx active start_delay initial_link_delay current_link_delay')
 StateUpdate = collections.namedtuple('StateUpdate', 'new_bw, indigo_flows_update, iperf_flows_udpate')
+
+
+class Event:
+    NEW_BW = 0
+    NEW_DELAY = 1
+
 
 class Scenario(object):
     def __init__(self, worker_cnt):
@@ -31,6 +40,16 @@ class Scenario(object):
 
         if self.enable_iperf_flows and self.enable_worker_start_delay:
             sys.exit('enable_iperf_flows and enable_worker_start_delay are incompatible')
+
+        # log file
+        log_dir = 'mn_logs'
+        try: 
+            os.makedirs(log_dir)
+        except OSError:
+            if not os.path.isdir(log_dir):
+                raise
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        self.log_file = log_dir + '/' + timestr + '_' + config.get_role() + '.log'
 
         if self.enable_worker_idling:
             while True:
@@ -91,6 +110,7 @@ class Scenario(object):
             new_bw = True
             self.current_bw = np.random.choice(self.available_bandwidths, size=1)[0]
             print('new bw: {}'.format(self.current_bw))
+            self.log(Event.NEW_BW, self.current_bw)
 
         # update workers
         for worker_idx in range(self.worker_cnt):
@@ -104,6 +124,7 @@ class Scenario(object):
                 new_link_delay = np.random.normal(loc=flow.initial_link_delay, scale=0.1*flow.initial_link_delay)
                 new_link_delay = max(flow.initial_link_delay, new_link_delay)
                 print('worker {} new delay: {}'.format(worker_idx, new_link_delay))
+                self.log(Event.NEW_DELAY, new_link_delay, worker=worker_idx)
             # create the new tuple
             self.indigo_flows[worker_idx] = IndigoFlow(worker_idx, True, flow.start_delay, flow.initial_link_delay, new_link_delay)
 
@@ -112,6 +133,11 @@ class Scenario(object):
             pass
 
         return StateUpdate(new_bw, indigo_flows_update, iperf_flows_udpate)
+
+    def log(self, event, value, worker=-1):
+        ts = time.time()
+        with open(self.log_file, 'a', 0) as fd:
+            fd.write('%.3f,%d,%s' % (ts, worker, str(value)))
 
     def get_active_iperf_flows(self):
         return self.iperf_flows
