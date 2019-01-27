@@ -74,7 +74,7 @@ class Sender(object):
         if self.train:
             self.step_cnt = 0
 
-            self.ts_first = None
+#            self.ts_first = None
             self.rtt_buf = []
 
     def cleanup(self):
@@ -112,8 +112,8 @@ class Sender(object):
         self.min_rtt = min(self.min_rtt, rtt)
 
         if self.train:
-            if self.ts_first is None:
-                self.ts_first = curr_time_ms
+#            if self.ts_first is None:
+#                self.ts_first = curr_time_ms
             self.rtt_buf.append(rtt)
 
         delay = rtt - self.min_rtt
@@ -213,7 +213,7 @@ class Sender(object):
                     self.step_cnt = 0
                     self.running = False
 
-                    self.compute_performance()
+#                    self.compute_performance()
 
     def run(self):
         POOLING_TIMEOUT = 1000  # ms
@@ -250,6 +250,7 @@ class Sender(object):
                     if self.window_is_open():
                         self.send()
 
+    """
     def compute_performance(self):
         duration = curr_ts_ms() - self.ts_first
         tput = 0.008 * self.delivered / duration
@@ -257,3 +258,9 @@ class Sender(object):
 
         with open(path.join(project_root.DIR, 'env', 'perf'), 'a', 0) as perf:
             perf.write('%.2f %d\n' % (tput, perc_delay))
+    """
+
+    def pass_rtt_buffer(self):
+        tmp = self.rtt_buf
+        self.rtt_buf = []
+        return tmp

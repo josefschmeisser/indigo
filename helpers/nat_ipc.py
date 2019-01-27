@@ -17,12 +17,17 @@ class IpcData(Structure):
         ("min_rtt", c_uint32),
         ("flow_is_active", c_bool),
         # set by the mn controller
-        ("cwnd", c_uint32),
+        ("opt_cwnd", c_uint32),
+
+        ("opt_rtt", c_uint32),
+        ("opt_tput", c_float),
+#        ("sub_episode", c_uint32),
+
         ("idle", c_bool),
         ("start_delay", c_uint32), # in ms
         ("task_id", c_uint32)]     # tensorflow task_id
 
-shm_fmt_str = '=HI?I?II'
+shm_fmt_str = '=HI?IIf?II'
 
 uint32_max = 2**32 - 1
 
@@ -47,7 +52,7 @@ class IndigoIpcMininetView(object):
         self.drain_queues()
 
         # set some initial values
-        self.ipc_data.contents.cwnd = int(default_cwnd)
+        self.ipc_data.contents.opt_cwnd = int(default_cwnd)
         self.ipc_data.contents.idle = False
         self.ipc_data.contents.start_delay = 0
         self.ipc_data.contents.task_id = uint32_max
@@ -57,8 +62,14 @@ class IndigoIpcMininetView(object):
     def drain_queues(self):
         pass #TODO drain message queues
 
+    """
     def set_cwnd(self, cwnd):
-        self.ipc_data.contents.cwnd = cwnd
+        self.ipc_data.contents.opt_cwnd = cwnd
+    """
+    def update_optimal_params(self, opt_cwnd, opt_rtt, opt_tput):
+        self.ipc_data.contents.opt_cwnd = opt_cwnd
+        self.ipc_data.contents.opt_rtt = opt_rtt
+        self.ipc_data.contents.opt_tput = opt_tput
 
     def set_idle_state(self, idle):
         self.ipc_data.contents.idle = idle
@@ -132,7 +143,10 @@ class IndigoIpcWorkerView(object):
         self.worker_msq_q = posix_ipc.MessageQueue('/indigo_worker_msg_q_worker_%d' % worker_id, posix_ipc.O_CREAT)
 
     def get_cwnd(self):
-        return self.ipc_data.contents.cwnd
+        return self.ipc_data.contents.opt_cwnd
+
+    def get_optimal_params(self):
+        return (self.ipc_data.contents.opt_cwnd, self.ipc_data.contents.opt_rtt, self.ipc_data.contents.opt_tput)
 
     def get_task_id(self):
         return self.ipc_data.contents.task_id
