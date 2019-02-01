@@ -1,9 +1,11 @@
 import sys
+import os
 import time
 import project_root
 import numpy as np
 import tensorflow as tf
 import datetime
+import time
 from tensorflow import contrib
 from os import path
 from models import DaggerLSTM
@@ -29,6 +31,7 @@ class DaggerLeader(object):
         self.num_workers = len(worker_tasks)
         self.aggregated_states = []
         self.aggregated_actions = []
+        self.sample_timestamps = []
         self.max_eps = 1000
         self.checkpoint_delta = 10
         self.checkpoint = self.checkpoint_delta
@@ -97,6 +100,18 @@ class DaggerLeader(object):
         saver.save(self.sess, model_path)
         sys.stderr.write('\nModel saved to param. server at %s\n' % model_path)
 
+    def load_dataset(self):
+        if not os.path.isfile(self.actions_file):
+            return
+        self.aggregated_actions = list(np.load(self.actions_file))
+        self.aggregated_states = list(np.load(self.states_file))
+        self.sample_timestamps = list(np.load(self.sample_timestamps_file))
+
+    def save_dataset(self):
+        np.save(self.actions_file, self.aggregated_actions)
+        np.save(self.states_file, self.aggregated_states)
+        np.save(self.sample_timestamps_file, self.sample_timestamps)
+
     def setup_tf_ops(self, server):
         """ Sets up Tensorboard operators and tools, such as the optimizer,
         summary values, Tensorboard, and Session.
@@ -139,6 +154,13 @@ class DaggerLeader(object):
         self.logdir = path.join(project_root.DIR, 'dagger_mn_nat', 'logs', log_name)
         make_sure_path_exists(self.logdir)
         self.summary_writer = tf.summary.FileWriter(self.logdir)
+
+        self.dataset_dir = path.join(project_root.DIR, 'dagger_mn_nat', 'dataset')
+        make_sure_path_exists(self.dataset_dir)
+        self.states_file = path.join(self.dataset_dir, 'states.npy')
+        self.actions_file = path.join(self.dataset_dir, 'actions.npy')
+        self.sample_timestamps_file = path.join(self.dataset_dir, 'sample_timestamps.npy')
+        self.load_dataset()
 
     def wait_on_workers(self):
         """ Update which workers are done or dead. Stale tokens will
@@ -291,6 +313,7 @@ class DaggerLeader(object):
                     data = self.sess.run(self.train_q.dequeue())
                     self.aggregated_states.append(data[0])
                     self.aggregated_actions.append(data[1])
+                    self.sample_timestamps.append(time.time())
 
                 if debug:
                     sys.stderr.write('[PSERVER]: start training\n')
@@ -304,6 +327,7 @@ class DaggerLeader(object):
             # Save the network model for testing every so often
             if curr_ep == self.checkpoint:
                 self.save_model(curr_ep)
+                self.save_dataset()
                 self.checkpoint += self.checkpoint_delta
 
             # After training, tell workers to start another episode
