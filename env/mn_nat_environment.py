@@ -57,16 +57,20 @@ class MininetNatEnvironment(object):
 
         with open(perf_file, 'a', 0) as perf:
             for curr, nxt in pairwise(self.sub_episodes):
+                if curr.opt_tput == 0.0:
+                    continue
+
                 end = nxt.ts_first if nxt is not None else curr_ts_ms()
                 duration = end - curr.ts_first
                 end_delivered = nxt.delivered_acc if nxt is not None else self.sender.delivered
                 delivered = end_delivered - curr.delivered_acc
+                print('duration: {}ms delivered: {}b'.format(duration, delivered))
 
                 perc_delay = float(np.percentile(curr.rtt_buf, 95))
                 delay_err = abs(perc_delay - curr.opt_rtt) / curr.opt_rtt
 
-                tput = 0.008 * delivered / duration
-                print('tput: {} opt_tput: {}'.format(tput, curr.opt_tput))
+                tput = 0.008 * delivered / duration # [Mbps]
+                print('tput: {0:.2f}Mbps opt_tput: {1:.2f}Mbps'.format(tput, curr.opt_tput))
                 tput_err = abs(tput - curr.opt_tput) / curr.opt_tput
 
                 if sub_episode > 0:
@@ -78,8 +82,9 @@ class MininetNatEnvironment(object):
             perf.write('\n')
 
         # reset
-        self.opt_rtt = None
-        self.opt_tput = None
+        self.current_opt_rtt = None
+        self.current_opt_tput = None
+        self.sub_episodes = []
 
     def __sample_action_hook(self, state):
         assert(self.sample_action)

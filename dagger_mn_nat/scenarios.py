@@ -3,9 +3,10 @@ import collections
 import sys
 import os
 import time
+import project_root
 from helpers.config import config
+from helpers.helpers import make_sure_path_exists
 from env.sender import default_cwnd
-
 
 # TODO what about the CRC checksum?
 packet_size = 1478 # (in bytes) (MAC header + IPv4 + UDP header + payload = 14 + 20 + 8 + 1436 = 1478)
@@ -42,14 +43,11 @@ class Scenario(object):
             sys.exit('enable_iperf_flows and enable_worker_start_delay are incompatible')
 
         # log file
-        log_dir = 'mn_logs'
-        try: 
-            os.makedirs(log_dir)
-        except OSError:
-            if not os.path.isdir(log_dir):
-                raise
+        log_dir = os.path.join(project_root.DIR, 'mn_logs')
+        make_sure_path_exists(log_dir)
         timestr = time.strftime("%Y%m%d-%H%M%S")
-        self.log_file = log_dir + '/' + timestr + '_' + config.get_role() + '.log'
+        log_file_name = timestr + '_' + config.get_role() + '.log'
+        self.log_file = os.path.join(log_dir, log_file_name)
 
         if self.enable_worker_idling:
             while True:
@@ -137,7 +135,7 @@ class Scenario(object):
     def log(self, event, value, worker=-1):
         ts = time.time()
         with open(self.log_file, 'a', 0) as fd:
-            fd.write('%.3f,%d,%s' % (ts, worker, str(value)))
+            fd.write('%.3f,%d,%s\n' % (ts, worker, str(value)))
 
     def get_active_iperf_flows(self):
         return self.iperf_flows

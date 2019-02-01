@@ -176,8 +176,9 @@ class Controller(object):
             cwnd = calculate_cwnd(scenario, current_flow.current_link_delay, flow_cnt)
             print('worker {} new cwnd: {} min_rtt: {} theoretical rtt: {}'.format(worker_idx, cwnd, ipc.get_min_rtt(), current_flow.current_link_delay))
 #            ipc.set_cwnd(cwnd)
-            bw = scenario.get_bandwidth() * 1.e6 / 8. / 1.e3 # [bytes/ms]
-            opt_tput = bw / float(flow_cnt)
+#            bw = scenario.get_bandwidth() * 1.e6 / 8. / 1.e3 # [bytes/ms]
+            bw = scenario.get_bandwidth() # [Mbps]
+            opt_tput = 0. if flow_cnt < 1 else bw / float(flow_cnt)
             ipc.update_optimal_params(cwnd, current_flow.current_link_delay, opt_tput)
 
     def execute_scenario(self, scenario):
@@ -275,6 +276,15 @@ class Controller(object):
         worker_idx = 0
         for worker_desc in self.our_worker_list:
             worker_host = self.net.get('h{0}'.format(worker_idx))
+            """
+            worker_cmd = './worker.py ' \
+                         '--job-name worker ' \
+                         '--worker-id {0} ' \
+                         '--task-index {1} ' \
+                         '--ps-hosts {2} ' \
+                         '--worker-hosts {3} >worker{0}-out.txt 2>&1 &' \
+                         .format(worker_idx, worker_desc['task_index'], self.ps_hosts_arg, self.worker_hosts_arg)
+            """
             worker_cmd = './worker.py ' \
                          '--job-name worker ' \
                          '--worker-id {0} ' \
@@ -314,7 +324,6 @@ class Controller(object):
 
     def rollout(self):
         # TODO wait until the queues are empty
-        # TODO obtain a new scenario
         for ipc in self.worker_ipc_objects:
             ipc.finalize_rollout_request()
 
