@@ -9,7 +9,7 @@ mn1:
   scenario:
     step_width: 0.5 # [sec]
     available_bandwidths: [10.0, 15.0, 20.0] # Mbps
-    bandwidth_change_probability: 0.1 # in [0.0, 1.0]
+    bandwidth_change_probability: 0.0 # in [0.0, 1.0]
     delay_change_probability: 0.0 # in [0.0, 1.0]
     loss_rate: 0.0 # in [0.0, 1.0]
     enable_iperf_flows: False
