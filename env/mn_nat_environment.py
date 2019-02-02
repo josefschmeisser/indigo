@@ -67,15 +67,16 @@ class MininetNatEnvironment(object):
                 print('duration: {}ms delivered: {}b'.format(duration, delivered))
 
                 perc_delay = float(np.percentile(curr.rtt_buf, 95))
-                delay_err = abs(perc_delay - curr.opt_rtt) / curr.opt_rtt
+#                delay_err = abs(perc_delay - curr.opt_rtt) / curr.opt_rtt
 
                 tput = 0.008 * delivered / duration # [Mbps]
                 print('tput: {0:.2f}Mbps opt_tput: {1:.2f}Mbps'.format(tput, curr.opt_tput))
-                tput_err = abs(tput - curr.opt_tput) / curr.opt_tput
+#                tput_err = abs(tput - curr.opt_tput) / curr.opt_tput
 
                 if sub_episode > 0:
                     perf.write('; ')
-                perf.write('%.2f,%.2f,%d,%.2f' % (tput, tput_err, perc_delay, delay_err))
+#                perf.write('%.2f,%.2f,%d,%.2f' % (tput, tput_err, perc_delay, delay_err))
+                perf.write('%.2f,%.2f,%.2f,%.2f' % (tput, curr.opt_tput, perc_delay, curr.opt_rtt))
 
                 sub_episode += 1
 

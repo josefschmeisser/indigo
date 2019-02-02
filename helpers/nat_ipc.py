@@ -85,12 +85,12 @@ class IndigoIpcMininetView(object):
 
     def handler_thread_fun(self, params):
         while True:
-            print('handler_thread loop')
+#            print('handler_thread loop')
             if not self.handler_fun:
                 self.handler_thread = None
                 return
             msg = self.mn_msg_q.receive()
-            print('handler_thread msg: %s', str(msg))
+#            print('handler_thread msg: %s', str(msg))
             try:
                 self.handler_fun(msg[0], params)
             except:
