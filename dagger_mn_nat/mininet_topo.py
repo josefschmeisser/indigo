@@ -245,10 +245,11 @@ class Controller(object):
         self.initialize_network_parameters()
         self.start_workers()
 
+        scenario = Scenario()
         for _ in range(number_of_episodes):
             if self.stop:
                 break
-            scenario = Scenario(self.worker_cnt)
+            scenario.set_up_new_epoch(self.worker_cnt)
             self.execute_scenario(scenario)
 
 #        CLI(self.net)

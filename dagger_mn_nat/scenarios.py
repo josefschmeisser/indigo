@@ -19,18 +19,14 @@ StateUpdate = collections.namedtuple('StateUpdate', 'new_bw, indigo_flows_update
 class Event:
     NEW_BW = 0
     NEW_DELAY = 1
+    NEW_BUFFER_SIZE = 2
 
 
 class Scenario(object):
-    def __init__(self, worker_cnt):
-        self.worker_cnt = worker_cnt
-        self.ts = 0
-        self.queue_size = 100000*np.random.randint(1, 100) # in bytes
-
-        # config
+    def __init__(self):
+        # read config
         self.scenario_config = config.get_our_section()['scenario']
         self.available_bandwidths = self.scenario_config['available_bandwidths']
-        self.current_bw = self.available_bandwidths[0]
         self.bandwidth_change_probability = self.scenario_config['bandwidth_change_probability']
         self.delay_change_probability = self.scenario_config['delay_change_probability']
         self.loss_rate = self.scenario_config['loss_rate']
@@ -42,12 +38,22 @@ class Scenario(object):
         if self.enable_iperf_flows and self.enable_worker_start_delay:
             sys.exit('enable_iperf_flows and enable_worker_start_delay are incompatible')
 
-        # log file
+        # initialize log file
         log_dir = os.path.join(project_root.DIR, 'mn_logs')
         make_sure_path_exists(log_dir)
         timestr = time.strftime("%Y%m%d-%H%M%S")
         log_file_name = timestr + '_' + config.get_role() + '.log'
         self.log_file = os.path.join(log_dir, log_file_name)
+
+    def set_up_new_epoch(self, worker_cnt):
+        self.ts = 0
+        self.worker_cnt = worker_cnt
+
+        self.queue_size = 100000*np.random.randint(1, 100) # in bytes
+        self.log(Event.NEW_BUFFER_SIZE, self.queue_size)
+
+        self.current_bw = np.random.choice(self.available_bandwidths, size=1)[0]
+        self.log(Event.NEW_BW, self.current_bw)
 
         if self.enable_worker_idling:
             while True:
@@ -135,7 +141,7 @@ class Scenario(object):
     def log(self, event, value, worker=-1):
         ts = time.time()
         with open(self.log_file, 'a', 0) as fd:
-            fd.write('%.3f,%d,%s\n' % (ts, worker, str(value)))
+            fd.write('%.3f,%d,%d,%s\n' % (ts, event, worker, str(value)))
 
     def get_active_iperf_flows(self):
         return self.iperf_flows
@@ -161,7 +167,6 @@ class Scenario(object):
         return self.scenario_config['step_width']
 
 
-# TODO check
 # min_rtt in ms
 def calculate_cwnd(scenario, min_rtt, flow_cnt):
     if flow_cnt < 1:

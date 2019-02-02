@@ -14,15 +14,12 @@ class IpcData(Structure):
     _fields_ = [
         # set by the worker:
         ("port", c_uint16),
-        ("min_rtt", c_uint32),
+        ("min_rtt", c_uint32),     # in ms
         ("flow_is_active", c_bool),
         # set by the mn controller
         ("opt_cwnd", c_uint32),
-
-        ("opt_rtt", c_uint32),
-        ("opt_tput", c_float),
-#        ("sub_episode", c_uint32),
-
+        ("opt_rtt", c_uint32),     # in ms
+        ("opt_tput", c_float),     # in Mbps
         ("idle", c_bool),
         ("start_delay", c_uint32), # in ms
         ("task_id", c_uint32)]     # tensorflow task_id
