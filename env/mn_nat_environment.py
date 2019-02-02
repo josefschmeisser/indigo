@@ -79,7 +79,8 @@ class MininetNatEnvironment(object):
 
                 sub_episode += 1
 
-            perf.write('\n')
+            if sub_episode > 0:
+                perf.write('\n')
 
         # reset
         self.current_opt_rtt = None
