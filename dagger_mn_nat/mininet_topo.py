@@ -165,18 +165,11 @@ class Controller(object):
             if not current_flow.active:
                 continue
             ipc = self.worker_ipc_objects[worker_idx]
-            """
-            min_rtt = ipc.get_min_rtt()
-            # min_rtt == 0 => min_rtt = current_link_delay
-            if min_rtt == 0:
-                min_rtt = current_flow.current_link_delay
-            """
+
+            # calculate new cwnd
             flow_cnt = active_indigo_flow_cnt + len(scenario.get_active_iperf_flows())
-#            cwnd = calculate_cwnd(scenario, min_rtt, flow_cnt)
             cwnd = calculate_cwnd(scenario, current_flow.current_link_delay, flow_cnt)
             print('worker {} new cwnd: {} min_rtt: {} theoretical rtt: {}'.format(worker_idx, cwnd, ipc.get_min_rtt(), current_flow.current_link_delay))
-#            ipc.set_cwnd(cwnd)
-#            bw = scenario.get_bandwidth() * 1.e6 / 8. / 1.e3 # [bytes/ms]
             bw = scenario.get_bandwidth() # [Mbps]
             opt_tput = 0. if flow_cnt < 1 else bw / float(flow_cnt)
             ipc.update_optimal_params(cwnd, current_flow.current_link_delay, opt_tput)
@@ -225,12 +218,10 @@ class Controller(object):
 
             time.sleep(step_width)
 
-#            print('execute_scenario: checking rollout requests...')
             self.resume_cv.acquire()
             notify = self.rollout_requests == self.worker_cnt
-#            print('execute_scenario: checking rollout requests - notify: %d' % notify)
             if notify:
-                print('notifying workers...')
+                print('starting new episode; notifying workers...')
                 self.rollout_requests = 0
                 self.resume_cv.notify_all()
                 self.resume_cv.release()
@@ -283,7 +274,6 @@ class Controller(object):
                          '--worker-id {0} ' \
                          '--task-index {1} ' \
                          '--ps-hosts {2} ' \
-                         '--worker-hosts {3} >worker{0}-out.txt 2>&1 &' \
                          .format(worker_idx, worker_desc['task_index'], self.ps_hosts_arg, self.worker_hosts_arg)
             """
             worker_cmd = './worker.py ' \
@@ -331,12 +321,12 @@ class Controller(object):
     def handle_rollout_request(self, worker_idx, ipc):
         self.resume_cv.acquire()
         self.rollout_requests += 1
-        print('waiting on cv')
+#        print('waiting on cv')
         self.resume_cv.wait()
         self.resume_cv.release()
         # clear receiver state
         self.restart_receiver(worker_idx)
-        print('rollout request handler finished')
+#        print('rollout request handler finished')
         ipc.finalize_rollout_request()
 
     def handle_cleanup_request(self):
@@ -348,8 +338,8 @@ class Controller(object):
         try:
             worker_idx = params[0]
             worker_ipc = params[1]
-            print('in handle_request() - params %s' % str(params))
-            print("received request: %s" % str(request))
+#            print('in handle_request() - params %s' % str(params))
+#            print("received request: %s" % str(request))
             if request == 'rollout':
                 self.handle_rollout_request(worker_idx, worker_ipc)
             elif request == 'cleanup':
