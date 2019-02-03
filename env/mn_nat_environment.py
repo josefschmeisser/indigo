@@ -48,18 +48,18 @@ class MininetNatEnvironment(object):
             self.current_opt_rtt = new_opt_rtt
             self.current_opt_tput = new_opt_tput
         elif new_opt_rtt != self.current_opt_rtt or new_opt_tput != self.current_opt_tput:
-            deliverd = self.sender.delivered # accumulated sum over all sub-episodes
+            delivered = self.sender.delivered # accumulated sum over all sub-episodes
             rtt_buf, ts_first = self.sender.pass_rtt_data()
             duration = curr_ts_ms() - ts_first
-            self.sub_episodes.append(SubEpisode(self.current_opt_rtt, self.current_opt_tput, duration, deliverd, rtt_buf))
+            self.sub_episodes.append(SubEpisode(self.current_opt_rtt, self.current_opt_tput, duration, delivered, rtt_buf))
             self.current_opt_rtt = new_opt_rtt
             self.current_opt_tput = new_opt_tput
 
     def __finalize_performance_measurments(self):
-        deliverd = self.sender.delivered # accumulated sum over all sub-episodes
+        delivered = self.sender.delivered # accumulated sum over all sub-episodes
         rtt_buf, ts_first = self.sender.pass_rtt_data()
         duration = curr_ts_ms() - ts_first
-        self.sub_episodes.append(SubEpisode(self.current_opt_rtt, self.current_opt_tput, duration, deliverd, rtt_buf))
+        self.sub_episodes.append(SubEpisode(self.current_opt_rtt, self.current_opt_tput, duration, delivered, rtt_buf))
 
     def __compute_performance(self):
         self.__finalize_performance_measurments()
@@ -67,12 +67,10 @@ class MininetNatEnvironment(object):
         perf_file = path.join(project_root.DIR, 'env', 'task_{}_perf'.format(self.ipc.get_task_id()))
         with open(perf_file, 'a', 0) as perf:
             sub_episode = 0
-            for curr, nxt in pairwise(self.sub_episodes):
-#                if curr.opt_tput == 0.0:
-#                    continue
-
-                end_delivered = nxt.delivered_acc if nxt is not None else self.sender.delivered
-                delivered = end_delivered - curr.delivered_acc
+            delivered_acc = 0
+            for curr in self.sub_episodes:
+                delivered = curr.delivered_acc - delivered_acc
+                delivered_acc = curr.delivered_acc
                 print('duration: {}ms delivered: {}b'.format(curr.duration, delivered))
 
                 perc_delay = float(np.percentile(curr.rtt_buf, 95))
