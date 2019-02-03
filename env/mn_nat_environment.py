@@ -16,7 +16,7 @@ import numpy as np
 import collections
 import itertools
 
-SubEpisode = collections.namedtuple('SubEpisode', 'opt_rtt, opt_tput, ts_first, delivered_acc, rtt_buf')
+SubEpisode = collections.namedtuple('SubEpisode', 'opt_rtt, opt_tput, duration, delivered_acc, rtt_buf')
 
 def pairwise(iterable):
     "s -> (s0,s1), (s1,s2), (s2, s3), ..."
@@ -43,33 +43,42 @@ class MininetNatEnvironment(object):
 
     def __fetch_optimal_params(self):
         _, new_opt_rtt, new_opt_tput = self.ipc.get_optimal_params()
-        if new_opt_rtt != self.current_opt_rtt or new_opt_tput != self.current_opt_tput:
-            ts_first = curr_ts_ms()
+        if self.current_opt_rtt is None:
+            assert(self.current_opt_tput is None)
+            self.current_opt_rtt = new_opt_rtt
+            self.current_opt_tput = new_opt_tput
+        elif new_opt_rtt != self.current_opt_rtt or new_opt_tput != self.current_opt_tput:
             deliverd = self.sender.delivered # accumulated sum over all sub-episodes
-            rtt_buf = self.sender.pass_rtt_buffer()
-            self.sub_episodes.append(SubEpisode(new_opt_rtt, new_opt_tput, ts_first, deliverd, rtt_buf))
+            rtt_buf, ts_first = self.sender.pass_rtt_data()
+            duration = curr_ts_ms() - ts_first
+            self.sub_episodes.append(SubEpisode(self.current_opt_rtt, self.current_opt_tput, duration, deliverd, rtt_buf))
             self.current_opt_rtt = new_opt_rtt
             self.current_opt_tput = new_opt_tput
 
+    def __finalize_performance_measurments(self):
+        deliverd = self.sender.delivered # accumulated sum over all sub-episodes
+        rtt_buf, ts_first = self.sender.pass_rtt_data()
+        duration = curr_ts_ms() - ts_first
+        self.sub_episodes.append(SubEpisode(self.current_opt_rtt, self.current_opt_tput, duration, deliverd, rtt_buf))
+
     def __compute_performance(self):
+        self.__finalize_performance_measurments()
+
         perf_file = path.join(project_root.DIR, 'env', 'task_{}_perf'.format(self.ipc.get_task_id()))
-        sub_episode = 0
-
         with open(perf_file, 'a', 0) as perf:
+            sub_episode = 0
             for curr, nxt in pairwise(self.sub_episodes):
-                if curr.opt_tput == 0.0:
-                    continue
+#                if curr.opt_tput == 0.0:
+#                    continue
 
-                end = nxt.ts_first if nxt is not None else curr_ts_ms()
-                duration = end - curr.ts_first
                 end_delivered = nxt.delivered_acc if nxt is not None else self.sender.delivered
                 delivered = end_delivered - curr.delivered_acc
-                print('duration: {}ms delivered: {}b'.format(duration, delivered))
+                print('duration: {}ms delivered: {}b'.format(curr.duration, delivered))
 
                 perc_delay = float(np.percentile(curr.rtt_buf, 95))
 #                delay_err = abs(perc_delay - curr.opt_rtt) / curr.opt_rtt
 
-                tput = 0.008 * delivered / duration # [Mbps]
+                tput = 0.008 * delivered / curr.duration # [Mbps]
                 print('tput: {0:.2f}Mbps opt_tput: {1:.2f}Mbps'.format(tput, curr.opt_tput))
 #                tput_err = abs(tput - curr.opt_tput) / curr.opt_tput
 
@@ -122,6 +131,7 @@ class MininetNatEnvironment(object):
         start_delay = self.ipc.get_start_delay()
         if start_delay > 0:
             time.sleep(1e-3*start_delay)
+
         self.ipc.set_flow_is_active(True)
         self.sender.run()
         self.ipc.set_flow_is_active(False)
@@ -131,7 +141,6 @@ class MininetNatEnvironment(object):
         self.cleanup()
         self.__start_sender()
 
-        print("MininetEnvironment.rollout")
         sys.stderr.write('Obtaining an episode from environment...\n')
         sys.stdout.flush()
 

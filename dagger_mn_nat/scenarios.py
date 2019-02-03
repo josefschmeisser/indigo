@@ -99,10 +99,12 @@ class Scenario(object):
                 self.iperf_flows.append(iPerfFlow(worker_idx, 0, per_flow_bw))
 
     def step(self, running_indigo_flow_cnt):
+        """
         if self.ts == 0:
             self.ts += 1
             return StateUpdate(True, True, True)
         self.ts += 1
+        """
 
         new_bw = False
         indigo_flows_update = False

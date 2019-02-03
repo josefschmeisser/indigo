@@ -74,7 +74,7 @@ class Sender(object):
         if self.train:
             self.step_cnt = 0
 
-#            self.ts_first = None
+            self.ts_first = None
             self.rtt_buf = []
 
     def cleanup(self):
@@ -112,8 +112,8 @@ class Sender(object):
         self.min_rtt = min(self.min_rtt, rtt)
 
         if self.train:
-#            if self.ts_first is None:
-#                self.ts_first = curr_time_ms
+            if self.ts_first is None:
+                self.ts_first = curr_time_ms
             self.rtt_buf.append(rtt)
 
         delay = rtt - self.min_rtt
@@ -260,7 +260,9 @@ class Sender(object):
             perf.write('%.2f %d\n' % (tput, perc_delay))
     """
 
-    def pass_rtt_buffer(self):
-        tmp = self.rtt_buf
+    def pass_rtt_data(self):
+        tmp_rtt_buf = self.rtt_buf
         self.rtt_buf = []
-        return tmp
+        tmp_ts_first = self.ts_first
+        self.ts_first = None
+        return (tmp_rtt_buf, tmp_ts_first)

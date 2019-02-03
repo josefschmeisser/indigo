@@ -158,8 +158,20 @@ class Controller(object):
             cnt += int(ipc.get_flow_is_active())
         return cnt
 
-    def update_cwnd_values(self, scenario):
-        active_indigo_flow_cnt = self.count_active_indigo_flows()
+    def count_initial_indigo_flows(self, flows):
+        cnt = 0
+        for flow in flows:
+            cnt += int(flow.active and flow.start_delay == 0)
+        return cnt
+
+    def wait_for_first_indigo_flow(self):
+        while True:
+            for worker_idx in range(self.worker_cnt):
+                ipc = self.worker_ipc_objects[worker_idx]
+                if ipc.get_flow_is_active():
+                    return
+
+    def update_cwnd_values(self, scenario, flow_cnt):
         for worker_idx in range(self.worker_cnt):
             current_flow = self.current_indigo_flows[worker_idx]
             if not current_flow.active:
@@ -167,12 +179,56 @@ class Controller(object):
             ipc = self.worker_ipc_objects[worker_idx]
 
             # calculate new cwnd
-            flow_cnt = active_indigo_flow_cnt + len(scenario.get_active_iperf_flows())
             cwnd = calculate_cwnd(scenario, current_flow.current_link_delay, flow_cnt)
             print('worker {} new cwnd: {} min_rtt: {} theoretical rtt: {}'.format(worker_idx, cwnd, ipc.get_min_rtt(), current_flow.current_link_delay))
             bw = scenario.get_bandwidth() # [Mbps]
-            opt_tput = 0. if flow_cnt < 1 else bw / float(flow_cnt)
+            assert(flow_cnt > 0)
+            opt_tput = bw / float(flow_cnt)
             ipc.update_optimal_params(cwnd, current_flow.current_link_delay, opt_tput)
+
+    def perform_initialization(self, scenario):
+        scenario_indigo_flows = scenario.get_indigo_flows()
+        initial_indigo_flow_cnt = self.count_initial_indigo_flows(scenario_indigo_flows)
+        active_iperf_flows = scenario.get_active_iperf_flows()
+        flow_cnt = initial_indigo_flow_cnt + len(active_iperf_flows)
+
+        # update parameters
+        self.adjust_global_network_parameters(scenario)
+        self.udpate_iperf_flows(active_iperf_flows)
+        self.update_indigo_flows(scenario_indigo_flows)
+        self.update_cwnd_values(scenario, flow_cnt)
+
+    def perform_step(self, scenario):
+        active_indigo_flow_cnt = self.count_active_indigo_flows()
+        state_update = scenario.step(active_indigo_flow_cnt)
+
+        scenario_indigo_flows = scenario.get_indigo_flows()
+        active_indigo_flow_cnt = self.count_active_indigo_flows()
+
+        active_iperf_flows = scenario.get_active_iperf_flows()
+        flow_cnt = active_indigo_flow_cnt + len(active_iperf_flows)
+
+        # update parameters
+        if state_update.new_bw:
+            self.adjust_global_network_parameters(scenario)
+        if state_update.iperf_flows_udpate:
+            self.udpate_iperf_flows(active_iperf_flows)
+        if state_update.indigo_flows_update:
+            self.update_indigo_flows(scenario_indigo_flows)
+        if flow_cnt > 0:
+            self.update_cwnd_values(scenario, flow_cnt)
+
+    def waiting_for_rollout(self):
+        self.resume_cv.acquire()
+        notify = self.rollout_requests == self.worker_cnt
+        self.rollout_requests = 0
+        self.resume_cv.release()
+        return notify
+
+    def wait_for_rollout(self):
+        while True:
+            if self.waiting_for_rollout():
+                return
 
     def execute_scenario(self, scenario):
         # reset
@@ -188,22 +244,22 @@ class Controller(object):
             ipc.set_idle_state(not active_workers[i])
             ipc.set_start_delay(indigo_flow.start_delay)
 
+        # update parameters
+        self.perform_initialization(scenario)
+
+        # finalize rollout
+        print('notifying workers...')
+        self.resume_cv.acquire()
+        self.resume_cv.notify_all()
+        self.resume_cv.release()
+
+        self.wait_for_first_indigo_flow()
+
         step_width = scenario.get_step_width()
         while not self.stop:
+            time.sleep(step_width)
             print 'execute_scenario() new step'
-            active_indigo_flow_cnt = self.count_active_indigo_flows()
-            state_update = scenario.step(active_indigo_flow_cnt)
-
-            # update parameters
-            if state_update.new_bw:
-                self.adjust_global_network_parameters(scenario)
-            if state_update.iperf_flows_udpate:
-                new_flows = scenario.get_active_iperf_flows()
-                self.udpate_iperf_flows(new_flows)
-            if state_update.indigo_flows_update:
-                scenario_indigo_flows = scenario.get_indigo_flows()
-                self.update_indigo_flows(scenario_indigo_flows)
-            self.update_cwnd_values(scenario)
+            self.perform_step(scenario)
 
             """
             if scenario.ts == 10:
@@ -216,8 +272,11 @@ class Controller(object):
                 exit(0)
             """
 
-            time.sleep(step_width)
+            if self.waiting_for_rollout():
+                return
 
+
+            """
             self.resume_cv.acquire()
             notify = self.rollout_requests == self.worker_cnt
             if notify:
@@ -227,6 +286,8 @@ class Controller(object):
                 self.resume_cv.release()
                 return
             self.resume_cv.release()
+            """
+
 
     def run(self):
         self.net.start()
@@ -235,6 +296,8 @@ class Controller(object):
 
         self.initialize_network_parameters()
         self.start_workers()
+
+        self.wait_for_rollout()
 
         scenario = Scenario()
         for _ in range(number_of_episodes):
