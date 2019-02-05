@@ -138,7 +138,15 @@ class DaggerLeader(object):
         self.train_op = optimizer.minimize(self.total_loss)
         """
         optimizer = tf.train.AdamOptimizer(self.learn_rate)
-        gradients, variables = zip(*optimizer.compute_gradients(self.total_loss))
+        opt_result = optimizer.compute_gradients(self.total_loss)
+        gradients, variables = zip(*opt_result)
+        print gradients
+        print variables
+        for gradient, variable in opt_result:
+            if gradient is None:
+                continue
+            grad_norm = tf.linalg.norm(gradient, ord='euclidean')
+            tf.summary.scalar(variable.name + '_grad_norm', grad_norm)
         gradients, _ = tf.clip_by_global_norm(gradients, 5.0)
         self.train_op = optimizer.apply_gradients(zip(gradients, variables))
 
