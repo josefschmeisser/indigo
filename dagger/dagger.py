@@ -137,7 +137,7 @@ class DaggerLocal(object):
                 'cd %s && git rev-parse @' % project_root.DIR, shell=True)
         date_time = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
         log_name = date_time + '-%s' % git_commit.strip()
-        self.logdir = path.join(project_root.DIR, 'dagger_mn_client', 'logs', log_name)
+        self.logdir = path.join(project_root.DIR, 'dagger', 'logs', log_name)
         make_sure_path_exists(self.logdir)
         self.summary_writer = tf.summary.FileWriter(self.logdir)
 
