@@ -107,10 +107,10 @@ class DaggerLeader(object):
         self.aggregated_states = list(np.load(self.states_file))
         self.sample_timestamps = list(np.load(self.sample_timestamps_file))
 
-    def save_dataset(self):
-        np.save(self.actions_file, self.aggregated_actions)
-        np.save(self.states_file, self.aggregated_states)
-        np.save(self.sample_timestamps_file, self.sample_timestamps)
+    def save_dataset(self, suffix=''):
+        np.save(self.actions_file + suffix, self.aggregated_actions)
+        np.save(self.states_file + suffix, self.aggregated_states)
+        np.save(self.sample_timestamps_file + suffix, self.sample_timestamps)
 
     def setup_tf_ops(self, server):
         """ Sets up Tensorboard operators and tools, such as the optimizer,
@@ -168,7 +168,8 @@ class DaggerLeader(object):
         self.states_file = path.join(self.dataset_dir, 'states.npy')
         self.actions_file = path.join(self.dataset_dir, 'actions.npy')
         self.sample_timestamps_file = path.join(self.dataset_dir, 'sample_timestamps.npy')
-        self.load_dataset()
+        # does not improve training performance
+#        self.load_dataset()
 
     def wait_on_workers(self):
         """ Update which workers are done or dead. Stale tokens will
@@ -273,6 +274,12 @@ class DaggerLeader(object):
                 batch_actions = self.aggregated_actions[start:end]
 
                 loss = self.run_one_train_step(batch_states, batch_actions)
+                if np.isnan(loss):
+                    self.save_dataset(suffix='_nan_abort')
+                    with np.printoptions(threshold=np.inf):
+                        print batch_states[-1]
+                        print batch_actions[-1]
+                    sys.exit(-1)
 
                 mean_loss += loss
                 max_loss = max(loss, max_loss)
