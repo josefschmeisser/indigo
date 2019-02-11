@@ -37,6 +37,7 @@ class DaggerLeader(object):
         self.checkpoint = self.checkpoint_delta
         self.learn_rate = 0.001
         self.regularization_lambda = 1e-4
+        self.dropout_rate = 0.3
         self.train_step = 0
 
         self.state_dim = Sender.state_dim
@@ -140,8 +141,6 @@ class DaggerLeader(object):
         optimizer = tf.train.AdamOptimizer(self.learn_rate)
         opt_result = optimizer.compute_gradients(self.total_loss)
         gradients, variables = zip(*opt_result)
-        print gradients
-        print variables
         for gradient, variable in opt_result:
             if gradient is None:
                 continue
@@ -231,7 +230,8 @@ class DaggerLeader(object):
         ret = self.sess.run(ops_to_run, feed_dict={
             pi.input: batch_states,
             self.actions: batch_actions,
-            pi.state_in: self.init_state})
+            pi.state_in: self.init_state,
+            pi.dropout_rate: self.dropout_rate})
 
         elapsed = (curr_ts_ms() - start_ts) / 1000.0
         sys.stderr.write('train step %d: time %.2f\n' %
