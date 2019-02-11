@@ -1,0 +1,23 @@
+ps1:
+  role_type: 'ps'
+  address: '172.17.0.2:5000'
+  task_index: 0
+
+mn1:
+  role_type: 'mn'
+  nat_ip: '10.0.0.254'
+  scenario:
+    step_width: 0.5 # [sec]
+    available_bandwidths: [10.0, 15.0, 20.0] # Mbps
+    bandwidth_change_probability: 0.0 # in [0.0, 1.0]
+    delay_change_probability: 0.0 # in [0.0, 1.0]
+    loss_rate: 0.0 # in [0.0, 1.0]
+    enable_iperf_flows: False
+    enable_variational_delay: False
+    enable_worker_idling: True
+    enable_worker_start_delay: False
+  workers:
+    - task_index: 0
+      address: '10.0.0.1:5001' # grpc port
+    - task_index: 1
+      address: '10.0.0.2:5002'
