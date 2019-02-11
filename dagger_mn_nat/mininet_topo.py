@@ -221,7 +221,8 @@ class Controller(object):
     def waiting_for_rollout(self):
         self.resume_cv.acquire()
         notify = self.rollout_requests == self.worker_cnt
-        self.rollout_requests = 0
+        if notify:
+            self.rollout_requests = 0
         self.resume_cv.release()
         return notify
 
