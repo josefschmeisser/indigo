@@ -64,6 +64,7 @@ class Sender(object):
         self.sent_bytes = 0
 
         self.min_rtt = float('inf')
+        self.last_rtt = self.min_rtt
         self.delay_ewma = None
         self.send_rate_ewma = None
         self.delivery_rate_ewma = None
@@ -109,6 +110,7 @@ class Sender(object):
 
         # Update RTT
         rtt = float(curr_time_ms - ack.send_ts)
+        self.last_rtt = rtt
         self.min_rtt = min(self.min_rtt, rtt)
 
         if self.train:

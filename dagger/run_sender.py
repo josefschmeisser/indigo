@@ -4,15 +4,18 @@ import argparse
 import project_root
 import numpy as np
 import tensorflow as tf
-import pandas as pd
+#import pandas as pd
+import time
 from os import path
 from env.sender import Sender
 from models import DaggerLSTM
 from helpers.helpers import normalize, one_hot, softmax, make_sure_path_exists
 
-class DataSetGen(object):
-    def __init__(self, output_file):
+
+class StateLogger(object):
+    def __init__(self, output_file, sender):
         self.output_file = output_file
+        self.sender = sender
 
     def log(self, state, action):
         # defined in env/sender.py
@@ -20,17 +23,23 @@ class DataSetGen(object):
         #         self.delivery_rate_ewma,
         #         self.send_rate_ewma,
         #         self.cwnd]
-        ts = pd.Timestamp.now().value
-        aug_state = [ts] + state + [action]
+#        ts = pd.Timestamp.now().value
+        ts = time.time()
+        log_data = [ts] + state + [action] + [self.sender.last_rtt]
         # we need a deliminter like ';' in order to detect unfinished writes
         # since pantheon simply kills our sending process
-        line = "%lu,%f,%f,%f,%d,%d;\n" % tuple(aug_state)
+        line = "%f,%f,%f,%f,%d,%d,%f;\n" % tuple(log_data)
         self.output_file.write(line)
 
-# TODO check: It does not seem like that this class serves any actuall "learning" purpose
-class Learner(object):
-    def __init__(self, dataset_gen, state_dim, action_cnt, restore_vars):
-        self.dataset_gen = dataset_gen
+
+class DummyStateLogger(object):
+    def log(self, state, action):
+        pass
+
+
+class DummyLearner(object):
+    def __init__(self, state_logger, state_dim, action_cnt, restore_vars):
+        self.state_logger = state_logger
         self.aug_state_dim = state_dim + action_cnt
         self.action_cnt = action_cnt
         self.prev_action = action_cnt - 1
@@ -84,7 +93,7 @@ class Learner(object):
         """
         ###
         self.prev_action = action
-        self.dataset_gen.log(state, action)
+        self.state_logger.log(state, action)
 
         # action = np.argmax(np.random.multinomial(1, action_probs[0] - 1e-5))
         # temperature = 1.0
@@ -93,34 +102,39 @@ class Learner(object):
         return action
 
 
+def run(args, sender, logger):
+    model_path = path.join(project_root.DIR, 'dagger', 'model', 'model')
+    learner = DummyLearner(
+        state_logger=logger,
+        state_dim=Sender.state_dim,
+        action_cnt=Sender.action_cnt,
+        restore_vars=model_path)
+    sender.set_sample_action(learner.sample_action)
+
+    try:
+        sender.handshake()
+        sender.run()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        sender.cleanup()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('port', type=int)
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--logfile', required=False)
     args = parser.parse_args()
 
-    output_dir = "/tmp/"
-    dataset_path = path.join(output_dir, 'indigo_dataset')
-
-    with open(dataset_path, 'w') as output_file:
-        dataset_gen = DataSetGen(output_file)
-
-        sender = Sender(args.port, debug=args.debug)
-        model_path = path.join(project_root.DIR, 'dagger', 'model', 'model')
-        learner = Learner(
-            dataset_gen=dataset_gen,
-            state_dim=Sender.state_dim,
-            action_cnt=Sender.action_cnt,
-            restore_vars=model_path)
-        sender.set_sample_action(learner.sample_action)
-
-        try:
-            sender.handshake()
-            sender.run()
-        except KeyboardInterrupt:
-            pass
-        finally:
-            sender.cleanup()
+    sender = Sender(args.port, debug=args.debug)
+    if args.logfile is not None:
+        with open(args.logfile, 'w') as fd:
+            logger = StateLogger(fd, sender)
+            run(args, sender, logger)
+    else:
+        logger = DummyStateLogger()
+        run(args, sender, logger)
 
 
 if __name__ == '__main__':

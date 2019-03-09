@@ -17,7 +17,7 @@ from mininet.link import TCLink
 from mininet.util import dumpNodeConnections, pmonitor
 from mininet.log import setLogLevel
 from multiprocessing import Process
-from dagger_mn_nat.scenarios import Scenario, calculate_cwnd
+from dagger.scenarios import Scenario, calculate_cwnd
 from helpers.config import config, get_full_worker_list, get_our_worker_list, get_ps_list
 from helpers.nat_ipc import IndigoIpcMininetView
 
