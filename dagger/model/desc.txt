@@ -1,0 +1,10 @@
+lr: 0.001
+dropout: no
+dataset reuse: no
+model: 2 stacked lstm cells
+hidden units: 32
+additional layers: no
+converged: yes
+scenario:
+- 1 worker
+- variable bandwidth (unlimited changes)
