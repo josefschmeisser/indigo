@@ -11,6 +11,7 @@ from env.sender import default_cwnd
 # TODO what about the CRC checksum?
 packet_size = 1478 # (in bytes) (MAC header + IPv4 + UDP header + payload = 14 + 20 + 8 + 1436 = 1478)
 cwnd_correction_factor = 0.95
+bw_change_cnt_threshold = 2
 iPerfFlow = collections.namedtuple('iPerfFlow', 'host_idx start_ts bw proto linux_congestion')
 IndigoFlow = collections.namedtuple('IndigoFlow', 'host_idx active start_delay initial_link_delay current_link_delay')
 StateUpdate = collections.namedtuple('StateUpdate', 'new_bw, indigo_flows_update, iperf_flows_udpate')
@@ -48,6 +49,7 @@ class Scenario(object):
     def set_up_new_epoch(self, worker_cnt):
         self.ts = 0
         self.worker_cnt = worker_cnt
+        self.bw_change_cnt = 0
 
         self.queue_size = 100000*np.random.randint(1, 100) # in bytes
         self.log(Event.NEW_BUFFER_SIZE, self.queue_size)
@@ -112,8 +114,10 @@ class Scenario(object):
 
         # update bandwidth
         adjust_bw = self.bandwidth_change_probability > np.random.random_sample()
+        adjust_bw = adjust_bw and self.bw_change_cnt < bw_change_cnt_threshold
         if adjust_bw:
             new_bw = True
+            self.bw_change_cnt += 1
             self.current_bw = np.random.choice(self.available_bandwidths, size=1)[0]
             print('new bw: {}'.format(self.current_bw))
             self.log(Event.NEW_BW, self.current_bw)
