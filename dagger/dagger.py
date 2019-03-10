@@ -140,14 +140,36 @@ class DaggerLeader(object):
         """
         optimizer = tf.train.AdamOptimizer(self.learn_rate)
         opt_result = optimizer.compute_gradients(self.total_loss)
-        gradients, variables = zip(*opt_result)
+
         for gradient, variable in opt_result:
             if gradient is None:
                 continue
             grad_norm = tf.linalg.norm(gradient, ord='euclidean')
             tf.summary.scalar(variable.name + '_grad_norm', grad_norm)
-        gradients, _ = tf.clip_by_global_norm(gradients, 5.0)
-        self.train_op = optimizer.apply_gradients(zip(gradients, variables))
+
+        gradients, variables = zip(*opt_result)
+        clipped_gradients, _ = tf.clip_by_global_norm(gradients, 5.0)
+
+#        clipped_gradients = tf.check_numerics(clipped_gradients, 'clipped_gradients numeric error')
+
+# result = tf.cond(x < y, lambda: tf.add(x, z), lambda: tf.square(y))
+# tf.py_func (same execution context?)
+
+        checked_gradients = []
+        inf_cnt = tf.constant(0, dtype=tf.int64)
+        for gradient in clipped_gradients:
+            if gradient is None:
+                continue
+            inf_cnt += tf.count_nonzero(tf.is_inf(gradient))
+        for gradient in clipped_gradients:
+            if gradient is None:
+                checked_gradients.append(None)
+                continue
+            zero_gradient = tf.zeros_like(gradient)
+            checked_gradient = tf.where(inf_cnt > 0, zero_gradient, gradient)
+            checked_gradients.append(checked_gradient)
+
+        self.train_op = optimizer.apply_gradients(zip(checked_gradients, variables))
 
         tf.summary.scalar('reduced_ce_loss', cross_entropy_loss)
         tf.summary.scalar('reg_loss', reg_loss)
