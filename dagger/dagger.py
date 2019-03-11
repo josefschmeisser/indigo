@@ -155,6 +155,7 @@ class DaggerLeader(object):
 # result = tf.cond(x < y, lambda: tf.add(x, z), lambda: tf.square(y))
 # tf.py_func (same execution context?)
 
+        """
         checked_gradients = []
         inf_cnt = tf.constant(0, dtype=tf.int64)
         for gradient in clipped_gradients:
@@ -168,8 +169,10 @@ class DaggerLeader(object):
             zero_gradient = tf.zeros_like(gradient)
             checked_gradient = tf.where(inf_cnt > 0, zero_gradient, gradient)
             checked_gradients.append(checked_gradient)
+        """
 
-        self.train_op = optimizer.apply_gradients(zip(checked_gradients, variables))
+#        self.train_op = optimizer.apply_gradients(zip(checked_gradients, variables))
+        self.train_op = optimizer.apply_gradients(zip(clipped_gradients, variables))
 
         tf.summary.scalar('reduced_ce_loss', cross_entropy_loss)
         tf.summary.scalar('reg_loss', reg_loss)
@@ -348,6 +351,12 @@ class DaggerLeader(object):
                         break
 
                     data = self.sess.run(self.train_q.dequeue())
+                    # discard invalid samples
+                    if not np.all(np.isfinite(data[0])):
+                        file_path = path.join(self.dataset_dir, 'invalid_states.npy')
+                        np.save(file_path, data[0])
+                        sys.stderr.write('[PSERVER]: discarding sample\n')
+                        continue
                     self.aggregated_states.append(data[0])
                     self.aggregated_actions.append(data[1])
                     self.sample_timestamps.append(time.time())
