@@ -8,7 +8,7 @@ import datetime
 import time
 from tensorflow import contrib
 from os import path
-from models import DaggerLSTM
+from models import create_model
 from experts import TrueDaggerExpert
 from env.sender import Sender
 from helpers.helpers import (
@@ -46,13 +46,13 @@ class DaggerLeader(object):
 
         # Create the master network and training/sync queues
         with tf.variable_scope('global'):
-            self.global_network = DaggerLSTM(
+            self.global_network = create_model(
                 state_dim=self.aug_state_dim, action_cnt=self.action_cnt)
 
         self.leader_device_cpu = '/job:ps/task:0/cpu:0'
         with tf.device(self.leader_device_cpu):
             with tf.variable_scope('global_cpu'):
-                self.global_network_cpu = DaggerLSTM(
+                self.global_network_cpu = create_model(
                     state_dim=self.aug_state_dim, action_cnt=self.action_cnt)
 
         cpu_vars = self.global_network_cpu.trainable_vars
@@ -424,12 +424,12 @@ class DaggerWorker(object):
         # Set up the shared global network and local network.
         with tf.device(self.leader_device):
             with tf.variable_scope('global_cpu'):
-                self.global_network_cpu = DaggerLSTM(
+                self.global_network_cpu = create_model(
                     state_dim=self.aug_state_dim, action_cnt=self.action_cnt)
 
         with tf.device(self.worker_device):
             with tf.variable_scope('local'):
-                self.local_network = DaggerLSTM(
+                self.local_network = create_model(
                     state_dim=self.aug_state_dim, action_cnt=self.action_cnt)
 
         self.init_state = self.local_network.zero_init_state(1)

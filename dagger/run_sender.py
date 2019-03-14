@@ -8,7 +8,7 @@ import tensorflow as tf
 import time
 from os import path
 from env.sender import Sender
-from models import DaggerLSTM
+from models import create_model
 from helpers.helpers import normalize, one_hot, softmax, make_sure_path_exists
 
 
@@ -50,7 +50,7 @@ class DummyLearner(object):
         ###
 
         with tf.variable_scope('global'):
-            self.model = DaggerLSTM(
+            self.model = create_model(
                 state_dim=self.aug_state_dim, action_cnt=action_cnt)
 
         self.lstm_state = self.model.zero_init_state(1)
