@@ -127,6 +127,7 @@ class MininetNatEnvironment(object):
         self.sender.handshake()
 
         start_delay = self.ipc.get_start_delay()
+        print('wait for %dms' % start_delay)
         if start_delay > 0:
             time.sleep(1e-3*start_delay)
 

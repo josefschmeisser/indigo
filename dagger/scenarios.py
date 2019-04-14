@@ -58,11 +58,9 @@ class Scenario(object):
         self.log(Event.NEW_BW, self.current_bw)
 
         if self.enable_worker_idling:
-            while True:
-                self.worker_vec = np.random.choice(a=[False, True], size=(worker_cnt))
-                cnt = np.count_nonzero(self.worker_vec)
-                if cnt > 0:
-                    break
+            active_cnt = np.random.randint(1, worker_cnt + 1)
+            self.worker_vec = np.zeros(worker_cnt, dtype=bool)
+            self.worker_vec[:active_cnt] = True
         else:
             self.worker_vec = np.ones(worker_cnt, dtype=bool)
 
@@ -74,9 +72,11 @@ class Scenario(object):
 
             # determine start delay
             start_delay = 0
-            has_start_delay = self.enable_worker_start_delay and (0.1 > np.random.random_sample())
+            has_start_delay = self.enable_worker_start_delay and (0.5 > np.random.random_sample())
+            has_start_delay = worker_idx > 0 and has_start_delay
             if has_start_delay:
-                start_delay = int(np.random.exponential())
+                start_delay = int(np.random.exponential()*100)
+                start_delay = min(start_delay, 1000)
 
             # determine the initinal link delay
             initial_link_delay = np.random.randint(10, 100)
