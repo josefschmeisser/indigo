@@ -58,8 +58,9 @@ class MininetNatEnvironment(object):
     def __finalize_performance_measurments(self):
         delivered = self.sender.delivered # accumulated sum over all sub-episodes
         rtt_buf, ts_first = self.sender.pass_rtt_data()
-        duration = curr_ts_ms() - ts_first
-        self.sub_episodes.append(SubEpisode(self.current_opt_rtt, self.current_opt_tput, duration, delivered, rtt_buf))
+        if ts_first is not None:
+            duration = curr_ts_ms() - ts_first
+            self.sub_episodes.append(SubEpisode(self.current_opt_rtt, self.current_opt_tput, duration, delivered, rtt_buf))
 
     def __compute_performance(self):
         self.__finalize_performance_measurments()
